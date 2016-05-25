@@ -6,6 +6,8 @@ and WOA13 1995-2004 profile.
 
 import os
 import sys
+sys.path.insert(1,'/lustre/tmp/uotilap/marnelam/netCDF4-1.2.2-py2.7-linux-x86_64.egg')
+#sys.path.insert(1,'/opt/Python/2.7/lib/python2.7/site-packages')
 import re
 import copy
 import glob
@@ -65,6 +67,8 @@ class WOA13profile(object):
         lat = np.array(fp.variables['lat'][:])
         iy = np.where(np.abs(lat-plat)==np.min(np.abs(lat-plat)))[0][0]
         lon = np.array(fp.variables['lon'][:])
+        # transfer negative lons to positive
+        lon[np.where(lon<0.)] += 360.
         ix = np.where(np.abs(lon-plon)==np.min(np.abs(lon-plon)))[0][0]
         time = np.array(fp.variables['time'][:])+1
         for t in time:
@@ -129,6 +133,8 @@ class ORAIPprofile(object):
         lat = np.array(fp.variables['lat'][:])
         iy = np.where(np.abs(lat-self.lat)==np.min(np.abs(lat-self.lat)))[0][0]
         lon = np.array(fp.variables['lon'][:])
+        # transfer negative lons to positive
+        lon[np.where(lon<0.)] += 360.
         ix = np.where(np.abs(lon-self.lon)==np.min(np.abs(lon-self.lon)))[0][0]
         if self.dset in ['ECDA']:
             time = fp.variables['TIME']
@@ -154,6 +160,11 @@ class Experiments(object):
         self.ylabel = "depth [m]"
         self.title = "%4.1f$^\circ$N, %5.1f$^\circ$E" % \
                      (exps[0].lat,exps[0].lon)
+        modstr = '_'.join([e.dset for e in self.exps])
+        self.figfile = "%s_%s_%04d-%04d_%04.1fN_%05.1fE.png" % \
+                     (self.exps[0].vname,modstr,\
+                      self.exps[0].syr,self.exps[0].eyr,\
+                      exps[0].lat,exps[0].lon)
         self.depth = np.hstack((exps[0].level_bounds[:,0],4000))
         # MMM = multimodel mean
         exmmm = copy.copy(exps[1])
@@ -172,18 +183,18 @@ class Experiments(object):
         for ia, ax in enumerate([ax1,ax2,ax3]):
             lnes, lgnds = [],[]
             # WOA13 climatology
-            y = np.hstack((self.exps[0].data,self.exps[0].data[-1]))
+            y = np.ma.hstack((self.exps[0].data,self.exps[0].data[-1]))
             lnes.append(ax.plot(y,self.depth,lw=3,\
                                 drawstyle='steps-pre',color='black')[0])
             lgnds.append(self.exps[0].dset)
             # multi-model mean
-            y = np.hstack((self.exps[-1].data,self.exps[-1].data[-1]))
+            y = np.ma.hstack((self.exps[-1].data,self.exps[-1].data[-1]))
             lnes.append(ax.plot(y,self.depth,lw=3,linestyle='--',\
                                 drawstyle='steps-pre',color='darkgrey')[0])
             lgnds.append(self.exps[-1].dset)
             # then individual models
             for exp in exps[li:li+lns_pplot[ia]]:
-                y = np.hstack((exp.data,exp.data[-1]))
+                y = np.ma.hstack((exp.data,exp.data[-1]))
                 lnes.append(ax.plot(y,self.depth,lw=2,\
                                     drawstyle='steps-pre',color=ModelLineColors[exp.dset])[0])
                 lgnds.append(exp.dset)
@@ -194,14 +205,13 @@ class Experiments(object):
             ax.set_title("%s) %s" % (Alphabets[ia],self.title))
             ax.set_xlabel(self.xlabel)
             ax.legend(lnes,tuple(lgnds),ncol=1,bbox_to_anchor=(1.2, 0.5))
-        modstr = '_'.join([e.dset for e in self.exps])
-        figfile = "%s_%s_%04d-%04d.png" % (self.exps[0].vname,modstr,\
-                                           self.exps[0].syr,self.exps[0].eyr)
         #plt.show()
-        plt.savefig(figfile)
+        plt.savefig(self.figfile)
 
 if __name__ == "__main__":
-    lon, lat = 10., 85.
+    # lons should be E and lats should be N
+    #lon, lat = 7., 80.
+    lon, lat = 220., 80.
     vname = 'T' # or 'S'
     models = ModelLineColors.keys()
     models.sort()
