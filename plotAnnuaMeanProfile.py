@@ -7,6 +7,7 @@ and WOA13 1995-2004 profile.
 import os
 import sys
 sys.path.insert(1,'/lustre/tmp/uotilap/marnelam/netCDF4-1.2.2-py2.7-linux-x86_64.egg')
+sys.path.insert(1,'/lustre/tmp/uotilap/marnelam/seawater-3.3.4-py2.7.egg')
 #sys.path.insert(1,'/opt/Python/2.7/lib/python2.7/site-packages')
 import re
 import copy
@@ -54,6 +55,8 @@ ModelLineColors = {"GECCO2":"darkred",\
                    "UR025":"lightblue",\
                    "EN3":"pink",\
                    "EN3v2a":"pink",\
+                   "EN4":"pink",\
+                   "EN4.2.0.g10":"pink",\
                   }
 # Models without Arctic: "ECCOJPL","GODAS","MOVEC","K7"
 # Models without sea ice: SODA
@@ -115,6 +118,8 @@ class ORAIPprofile(object):
         self.dset = dset
         if dset=='EN3' and vname=='S':
             self.dset = dset = 'EN3v2a'
+        if dset=='EN4':
+            self.dset = dset = 'EN4.2.0.g10'
         self.vname = vname # T or S
         self.path = path
         self.lat = plat
@@ -139,7 +144,7 @@ class ORAIPprofile(object):
             fns = glob.glob(os.path.join(path,"%s_int%s_annmean_????to????_%d-%dm_r360x180.nc" % \
                                               (dset,vname,lb[0],lb[1])))
             if len(fns) and os.path.exists(fns[0]):
-                    ldata = self.readOneFile(fns[0],lb)
+                ldata = self.readOneFile(fns[0],lb)
             else:
                 # level is missing, need to calculate it from two other
                 # levels. E.g. 100-300m is 0-300m minus 0-100m
@@ -147,19 +152,22 @@ class ORAIPprofile(object):
                                                  (dset,vname,0,lb[0])))[0]
                 ldatau = self.readOneFile(fn,[0,lb[0]])
                 if dset in ['GloSea5_GO5'] and lb[1] in [6000]:
-                    fn = glob.glob(os.path.join(path,"%s_int%s_annmean_????to????_%d-%s_r360x180.nc" % \
-                                                     (dset,vname,0,'bottom')))[0]
+                    fns = glob.glob(os.path.join(path,"%s_int%s_annmean_????to????_%d-%s_r360x180.nc" % \
+                                                     (dset,vname,0,'bottom')))
                 else:
-                    fn = glob.glob(os.path.join(path,"%s_int%s_annmean_????to????_%d-%dm_r360x180.nc" % \
-                                                     (dset,vname,0,lb[1])))[0]
-                ldatal = self.readOneFile(fn,[0,lb[1]])
-                ldata = ldatal - ldatau
+                    fns = glob.glob(os.path.join(path,"%s_int%s_annmean_????to????_%d-%dm_r360x180.nc" % \
+                                                     (dset,vname,0,lb[1])))
+                if len(fns) and os.path.exists(fns[0]):
+                    ldatal = self.readOneFile(fns[0],[0,lb[1]])
+                    ldata = ldatal - ldatau
+                else:
+                    ldata = np.zeros(ldatau.shape)
             data[li].append(ldata/np.diff(self.level_bounds)[li])
-        if vname=='T':
-            self.data = np.ma.masked_equal(np.ma.squeeze(data),0)
-        else: #S
+        #if vname=='T':
+        self.data = np.ma.masked_equal(np.ma.squeeze(data),0)
+        #else: #S
             #self.data = np.ma.masked_less_equal(np.ma.squeeze(data),32)
-            self.data = np.ma.squeeze(data)
+        #    self.data = np.ma.squeeze(data)
         #self.data = np.ma.squeeze(data)
 
     def readGECCO2salinity(self,dsyr=1948,deyr=2011):
@@ -251,6 +259,11 @@ class ORAIPprofile(object):
                 cdftime = utime(time.units)
             dates = [cdftime.num2date(t) for t in time[:]]
         ldata = []
+        if not fp.variables.has_key(self.ncname):
+            """ EN4 has t|s_int_depth variable
+            """
+            self.ncname = [k for k in fp.variables.keys() if \
+                           re.match("%s_int_\d+" % (self.vname.lower()),k)][0]
         for i,t in enumerate(time[:]):
             date = dates[i]
             if date.year in range(self.syr,self.eyr+1):
@@ -286,7 +299,7 @@ class TOPAZprofile(object):
         self.eyr = eyr
         self.level_bounds = LevelBounds[vname]
         fn = "%s_r360x180_%s_%04d_%02d.nc" % (self.dset,fvarstr,syr,1)
-        fp = nc.Dataset(fn)
+        fp = nc.Dataset(os.path.join(self.path,fn))
         depth = np.array(fp.variables['depth'][:])
         lat = np.array(fp.variables['latitude'][:])
         lon = np.array(fp.variables['longitude'][:])
@@ -301,7 +314,7 @@ class TOPAZprofile(object):
         for y in years:
             for m in self.months:
                 fn = "%s_r360x180_%s_%04d_%02d.nc" % (self.dset,fvarstr,y,m)
-                fp = nc.Dataset(fn)
+                fp = nc.Dataset(os.path.join(self.path,fn))
                 ldata.append(np.ma.array(fp.variables[self.ncname][:,iy,ix])) # depth, lat, lon
                 fp.close()
         tavg_data = np.ma.mean(ldata,axis=0)
@@ -335,7 +348,7 @@ class ORAP5profile(object):
             fvarstr = 'salinity'
             self.ncname = 'vosaline'
         fn = "%s3D_%s_1m_1993-2012_r360x180.nc" % (fvarstr,self.dset.lower())
-        fp = nc.Dataset(fn)
+        fp = nc.Dataset(os.path.join(self.path,fn))
         depth = np.array(fp.variables['deptht'][:])
         lat = np.array(fp.variables['lat'][:])
         lon = np.array(fp.variables['lon'][:])
@@ -387,7 +400,7 @@ class GSOP_GLORYS2V4profile(object):
         else:
             fn = "%s_ORCA025_SC.nc" % (self.dset)
             varname = 'saltc'
-        fp = nc.Dataset(fn)
+        fp = nc.Dataset(os.path.join(self.path,fn))
         lat = np.array(fp.variables['lat'][:])
         lon = np.array(fp.variables['lon'][:])
         # transfer negative lons to positive
@@ -481,6 +494,8 @@ class Experiments(object):
                     lgnds.append('GloSea5')
                 elif exp.dset=='EN3v2a':
                     lgnds.append('EN3')
+                elif exp.dset=='EN4.2.0.g10':
+                    lgnds.append('EN4')
                 else:
                     lgnds.append(exp.dset)
             ax.invert_yaxis()
@@ -549,6 +564,8 @@ class Experiments(object):
                     lgnds.append('GLORYS2V4')
                 elif texp.dset=='GloSea5_GO5':
                     lgnds.append('GloSea5')
+                elif texp.dset=='EN4.2.0.g10':
+                    lgnds.append('EN4')
                 else:
                     lgnds.append(texp.dset)
             if ia==0:
@@ -566,8 +583,6 @@ if __name__ == "__main__":
     #lon, lat = 7., 80.
     #lon, lat = 220., 80.
     vname = 'S' # 'T' or 'S'
-    #models = ['CGLORS','ECDA','GloSea5_GO5',\
-    #          'MOVEG2','UoR','EN3v2a','GECCO2']
     models = ['CGLORS', 'ECDA','GloSea5_GO5',\
               'MOVEG2', 'UoR','EN3','GECCO2']
     Sxperiments = Experiments([WOA13profile(vname,lon,lat)]+ \
