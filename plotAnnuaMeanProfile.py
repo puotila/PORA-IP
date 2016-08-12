@@ -164,7 +164,10 @@ class ORAIPprofile(object):
                     ldata = np.zeros(ldatau.shape)
             data[li].append(ldata/np.diff(self.level_bounds)[li])
         #if vname=='T':
-        self.data = np.ma.masked_equal(np.ma.squeeze(data),0)
+        if self.dset in ['EN4.2.0.g10'] and vname=='T':
+            self.data = np.ma.masked_equal(np.ma.squeeze(data),0)-273.15
+        else:
+            self.data = np.ma.masked_equal(np.ma.squeeze(data),0)
         #else: #S
             #self.data = np.ma.masked_less_equal(np.ma.squeeze(data),32)
         #    self.data = np.ma.squeeze(data)
@@ -462,8 +465,10 @@ class Experiments(object):
                               'S':['CGLORS','GECCO2','GSOP_GLORYS2V4','GloSea5_GO5']},\
                              {'T':['ORAP5','TP4','UoR'],\
                               'S':['ORAP5','TP4','UoR']},\
-                             {'T':['ECDA','MOVEG2','EN3'],\
-                              'S':['ECDA','MOVEG2','EN3v2a']}]
+                             {'T':['ECDA','MOVEG2','EN4.2.0.g10'],\
+                              'S':['ECDA','MOVEG2','EN4.2.0.g10']}]
+                             #{'T':['ECDA','MOVEG2','EN3'],\
+                             # 'S':['ECDA','MOVEG2','EN3v2a']}]
 
     def plotProfiles(self):
         fig = plt.figure(figsize=(8*2,10))
@@ -584,7 +589,7 @@ if __name__ == "__main__":
     #lon, lat = 220., 80.
     vname = 'S' # 'T' or 'S'
     models = ['CGLORS', 'ECDA','GloSea5_GO5',\
-              'MOVEG2', 'UoR','EN3','GECCO2']
+              'MOVEG2', 'UoR','EN4','GECCO2']
     Sxperiments = Experiments([WOA13profile(vname,lon,lat)]+ \
                               [ORAIPprofile(vname,lon,lat,dset=model) \
                                for model in models]+\
