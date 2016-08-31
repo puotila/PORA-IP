@@ -1,0 +1,127 @@
+\documentclass{beamer}
+
+\begin{document}
+  \begin{frame}
+    \frametitle{ORA products used for hydrographic analysis}
+    \begin{itemize}
+        \item Observational
+        \begin{itemize}
+        \item Climatology by Hiroshi Sumata (AWI) 1980--2015.
+        \item WOA13 1995--2004. 
+        \end{itemize}
+        \item ORA products, 1993--2009.
+        \begin{itemize}
+        \item CGLORS$^*$, GECCO2 (4DVAR), GLORYS2V4$^*$ and GloSea5$^*$.
+        \item ORAP5$^*$, TP4$^*$ and UoR$^*$.
+        \item ECDA, MOVEG2, EN4 (objective analysis).
+        \end{itemize}
+    \end{itemize}
+    ($^*$) Indicates products with sea-ice observation assimilation.
+  \end{frame}
+  \begin{frame}
+    \frametitle{Notes on diagnostics}
+    \begin{columns}
+    \begin{column}{0.48\textwidth}
+    \includegraphics[width=\columnwidth]{{PORA-IP-Arctic-points}.png}
+    \begin{itemize}
+    \item Three locations (above) selected for the analysis (Amerasian, Central Arctic and Eurasian basin).
+    \item T and S calculated from layer-averaged heat and salinity content data.
+    \end{itemize}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+    \begin{itemize}
+    \item Seven layers: 0--10, 10--100, 100--300, 300--700, 700--1500, 1500--3000 and 3000--4000 m.
+    \item T and S profiles are compared plus TS-diagrams.
+    \item Two representative locations, one in the Nansen Basin and another in the AmerAsian Basin are selected (todo).
+    \item A transect across Fram Strait is analysed (todo).
+    \item In TS-diagrams 0--10 m layer is not presented.
+    \end{itemize}
+    \end{column}
+    \end{columns}
+  \end{frame}
+  \begin{frame}
+    \frametitle{Temperature profiles from central Arctic.}
+    \includegraphics[width=\textwidth]{{T_Sumata_WOA13_CGLORS_ECDA_GloSea5_GO5_MOVEG2_UoR_EN4.2.0.g10_GECCO2_GSOP_GLORYS2V4_ORAP5_TP4_1980-2015_88.0N_010.0E}.png}
+    \begin{itemize}
+    \item Sumata fresher than WOA13 in 0-100m.
+    \item GLORYS2V4 the saltiest model, then MOVEG2.
+    \item TP4 the freshest model product.
+    \end{itemize}
+  \end{frame}
+  \begin{frame}
+    \frametitle{Salinity profiles from central Arctic.}
+    \includegraphics[width=0.8\textwidth]{{S_Sumata_WOA13_CGLORS_ECDA_GloSea5_GO5_MOVEG2_UoR_EN4.2.0.g10_GECCO2_GSOP_GLORYS2V4_ORAP5_TP4_1980-2015_88.0N_010.0E}.png}
+    \begin{itemize}
+    \item MOVEG2 is very cold.
+    \item Sumata surface is much warmer than WOA13 and ORA surface temperatures closer to WOA13.
+    \item GECCO2 has the warmest Atlantic layer, TP4 closest to Sumata and WOA13 in the Atlantic layer (300--700 m).
+    \item TP4 is closest to Sumata and WOA13 in the Atlantic layer.
+    \end{itemize}
+  \end{frame}
+  \begin{frame}
+    \frametitle{TS diagrams from central Arctic.}
+    \includegraphics[width=\textwidth]{{ST_Sumata_WOA13_CGLORS_ECDA_GloSea5_GO5_MOVEG2_UoR_EN4.2.0.g10_GECCO2_GSOP_GLORYS2V4_ORAP5_TP4_1980-2015_88.0N_010.0E}.png}
+    \begin{itemize}
+    \item Sumata TS at surface is very warm and fresh compared to others.
+    \item MOVEG2 seems also quite different than others.
+    \end{itemize}
+  \end{frame}
+  \begin{frame}
+    \frametitle{Temperature profiles from Nansen Basin.}
+    \includegraphics[width=0.8\textwidth]{{T_Sumata_WOA13_CGLORS_ECDA_GloSea5_GO5_MOVEG2_UoR_EN4.2.0.g10_GECCO2_GSOP_GLORYS2V4_ORAP5_TP4_1980-2015_83.0N_100.0E}.png}
+    \begin{itemize}
+    \item MOVEG2 and TP4 are cold in top 300 m.
+    \item Generally ORAs are colder than Sumata and WOA13 in the Atlantic layer.
+    \item At surface Sumata is warmer than WOA13.
+    \item ORAP5 has the warmest Atlantic layer, UoR has a wide one and GLORYS2V4 a rather cold one.
+    \end{itemize}
+  \end{frame}
+  \begin{frame}
+    \frametitle{Salinity profiles from Nansen Basin.}
+    \includegraphics[width=\textwidth]{{S_Sumata_WOA13_CGLORS_ECDA_GloSea5_GO5_MOVEG2_UoR_EN4.2.0.g10_GECCO2_GSOP_GLORYS2V4_ORAP5_TP4_1980-2015_83.0N_100.0E}.png}
+    \begin{itemize}
+    \item Sumata is much fresher than WOA13 in top 100 m.
+    \item Model salinities are between WOA13 and Sumata.
+    \end{itemize}
+  \end{frame}
+  \begin{frame}
+    \frametitle{TS diagrams from Nansen Basin.}
+    \includegraphics[width=\textwidth]{{ST_Sumata_WOA13_CGLORS_ECDA_GloSea5_GO5_MOVEG2_UoR_EN4.2.0.g10_GECCO2_GSOP_GLORYS2V4_ORAP5_TP4_1980-2015_83.0N_100.0E}.png}
+    \begin{itemize}
+    \item Sumata is rather different from others.
+    \end{itemize}
+  \end{frame}
+  \begin{frame}
+    \frametitle{Temperature profiles from Amerasian Basin.}
+    \includegraphics[width=0.8\textwidth]{{T_Sumata_WOA13_CGLORS_ECDA_GloSea5_GO5_MOVEG2_UoR_EN4.2.0.g10_GECCO2_GSOP_GLORYS2V4_ORAP5_TP4_1980-2015_80.0N_220.0E}.png}
+    \begin{itemize}
+    \item In top 700 m, ORAs are colder than WOA13 and Sumata. In top 300 m, Sumata is very warm compared to WOA13.
+    \item MOVEG2 is the coldest; ECDA is missing the warm water entirely; UoR, GECCO2 and EN4 are warmest.
+    \item Agreement is reasonable below 700m.
+    \end{itemize}
+  \end{frame}
+  \begin{frame}
+    \frametitle{Salinity profiles from Amerasian Basin.}
+    \includegraphics[width=\textwidth]{{S_Sumata_WOA13_CGLORS_ECDA_GloSea5_GO5_MOVEG2_UoR_EN4.2.0.g10_GECCO2_GSOP_GLORYS2V4_ORAP5_TP4_1980-2015_80.0N_220.0E}.png}
+    \begin{itemize}
+    \item Sumata is the saltiest, GECCO2 the freshest (100--300 m).
+    \item In 10--100 m, WOA13, EN4, GloSea5, ORAP5 and UoR are rather fresh.
+    \end{itemize}
+  \end{frame}
+  \begin{frame}
+    \frametitle{TS diagrams from Amerasian Basin.}
+    \includegraphics[width=\textwidth]{{ST_Sumata_WOA13_CGLORS_ECDA_GloSea5_GO5_MOVEG2_UoR_EN4.2.0.g10_GECCO2_GSOP_GLORYS2V4_ORAP5_TP4_1980-2015_80.0N_220.0E}.png}
+    \begin{itemize}
+    \item Sumata somewhat closer to others than in Eurasian basin, although still colder and fresher in the surface layer.
+    \end{itemize}
+  \end{frame}
+  \begin{frame}
+    \frametitle{General remarks}
+    \begin{itemize}
+    \item Differences large in top 700 m, better agreement deeper.
+    \item ORAs seem to have too cold Atlantic layer.
+    \item Sumata climatology is colder and fresher from ORAs and WOA13, particularly in upper layers.
+    \end{itemize}
+  \end{frame}
+
+\end{document}
