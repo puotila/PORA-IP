@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """
 Plot ORA-IP annual mean profile (T or S)
-and WOA13 1995-2004 profile.
+and Hiroshis or WOA13 1995-2004 profile.
 """
 
 import os
@@ -40,6 +40,7 @@ ModelLineColors = {"GECCO2":"darkred",\
                    "TP4":"green",\
                    "GLORYS2V1":"orange",\
                    "G2V3":"orange",\
+                   "GSOP_GLORYS2V3":"orange",\
                    "GSOP_GLORYS2V4":"orange",\
                    "MOVEG2":"cyan",\
                   #"PEODAS":"cyan",\
@@ -152,8 +153,16 @@ class ORAIPprofile(object):
                                                  (dset,vname,0,lb[0])))[0]
                 ldatau = self.readOneFile(fn,[0,lb[0]])
                 if dset in ['GloSea5_GO5'] and lb[1] in [6000]:
-                    fns = glob.glob(os.path.join(path,"%s_int%s_annmean_????to????_%d-%s_r360x180.nc" % \
-                                                     (dset,vname,0,'bottom')))
+                    if vname=='S':
+                        fns = glob.glob(os.path.join(path,"%s_int%s_annmean_????to????_%d-%s_r360x180.nc" % \
+                                                         (dset,vname,0,'bottom')))
+                    else:
+                        lb[1] = 4000.
+                        fns = glob.glob(os.path.join(path,"%s_int%s_annmean_????to????_%d-%d_r360x180.nc" % \
+                                                         (dset,vname,0,lb[1])))
+                elif dset in ['EN4.2.0.g10'] and lb[1] in [6000]:
+                    fns = glob.glob(os.path.join(path,"%s_int%s_annmean_????to????_%s_r360x180.nc" % \
+                                                     (dset,vname,'full')))
                 else:
                     fns = glob.glob(os.path.join(path,"%s_int%s_annmean_????to????_%d-%dm_r360x180.nc" % \
                                                      (dset,vname,0,lb[1])))
@@ -164,10 +173,14 @@ class ORAIPprofile(object):
                     ldata = np.zeros(ldatau.shape)
             data[li].append(ldata/np.diff(self.level_bounds)[li])
         #if vname=='T':
-        if self.dset in ['EN4.2.0.g10'] and vname=='T':
-            self.data = np.ma.masked_equal(np.ma.squeeze(data),0)-273.15
-        else:
-            self.data = np.ma.masked_equal(np.ma.squeeze(data),0)
+        #if self.dset in ['EN4.2.0.g10'] and vname=='T':
+        #    self.data = np.ma.masked_equal(np.ma.squeeze(data),0)-273.15
+        #else:
+        self.data = np.ma.masked_equal(np.ma.squeeze(data),0)
+        if vname=='S' and self.data[-1]<self.data[-2]:
+            self.data[-1] = self.data[-2]
+        if vname=='S' and self.data[-2]<self.data[-3]:
+            self.data[-1] = self.data[-2] = self.data[-3]
         #else: #S
             #self.data = np.ma.masked_less_equal(np.ma.squeeze(data),32)
         #    self.data = np.ma.squeeze(data)
@@ -218,8 +231,10 @@ class ORAIPprofile(object):
     def readOneFile(self,fn,lb):
         #fpat = ".+/%s_int%s_annmean_(\d+)to(\d+)_%d-%dm_r360x180.nc" % \
         #       (self.dset,self.vname,lb[0],lb[1])
-        fpat = ".+/%s_int%s_annmean_(\d+)to(\d+)_%d-.+_r360x180.nc" % \
-               (self.dset,self.vname,lb[0])
+        #fpat = ".+/%s_int%s_annmean_(\d+)to(\d+)_%d-.+_r360x180.nc" % \
+        #       (self.dset,self.vname,lb[0])
+        fpat = ".+/%s_int%s_annmean_(\d+)to(\d+)_.+_r360x180.nc" % \
+               (self.dset,self.vname)
         m = re.match(fpat,fn)
         dsyr, deyr = [int(i) for i in m.groups()]
         fp = nc.Dataset(fn)
@@ -266,7 +281,8 @@ class ORAIPprofile(object):
             """ EN4 has t|s_int_depth variable
             """
             self.ncname = [k for k in fp.variables.keys() if \
-                           re.match("%s_int_\d+" % (self.vname.lower()),k)][0]
+                           re.match("%s_int_" % (self.vname.lower()),k)][0]
+            #               re.match("%s_int_\d+" % (self.vname.lower()),k)][0]
         for i,t in enumerate(time[:]):
             date = dates[i]
             if date.year in range(self.syr,self.eyr+1):
@@ -424,21 +440,34 @@ class GSOP_GLORYS2V4profile(object):
             for i,t in enumerate(time[:]):
                 date = dates[i]
                 if date.year in range(self.syr,self.eyr+1):
-                    ldatal = np.ma.array(fp.variables[ncnamel][i,iy,ix])
+                    ldatal = fp.variables[ncnamel][i,iy,ix]
                     if ncnameu in ['z0heatc','z0saltc']:
-                        ldata = np.ma.mean(ldatal)
+                        ldata.append(ldatal/lb[1])
                     else:
-                        ldatau = np.ma.array(fp.variables[ncnameu][i,iy,ix])
-                        ldata = np.ma.mean(ldatal) - np.ma.mean(ldatau)
-            data[li].append(ldata/np.diff(self.level_bounds)[li])
+                        ldatau = fp.variables[ncnameu][i,iy,ix]
+                        ldata.append((ldatal-ldatau)/(lb[1]-lb[0]))
+            data[li].append(np.ma.mean(ldata))
         fp.close()
         if vname=='T':
             self.data = np.ma.masked_equal(np.ma.squeeze(data),0)
         else: #S
             self.data = np.ma.masked_less_equal(np.ma.squeeze(data),32)
+            if self.data[-1]<self.data[-2]:
+                self.data[-1] = self.data[-2]
+            if self.data[-2]<self.data[-3]:
+                self.data[-1] = self.data[-2] = self.data[-3]
+
+class GSOP_GLORYS2V3profile(GSOP_GLORYS2V4profile):
+    def __init__(self,vname,plon,plat,dset='GSOP_GLORYS2V3',\
+                 syr=1993,eyr=2009,\
+                 path='/lustre/tmp/uotilap/ORA-IP/annual_mean/'):
+        super( GSOP_GLORYS2V3profile, self).__init__(vname,plon,plat,\
+                                                     dset=dset,\
+                                                     syr=syr,eyr=eyr,\
+                                                     path=path)
 
 class Experiments(object):
-    """ Container for data (keep WOA13 first)
+    """ Container for data (keep obs climatolog first)
     """
     def __init__(self,exps):
         self.exps = exps
@@ -456,9 +485,10 @@ class Experiments(object):
                       self.exps[0].syr,self.exps[0].eyr,\
                       exps[0].lat,exps[0].lon)
         # MMM = multimodel mean
-        exmmm = copy.copy(exps[1])
+        frstmodidx = 2
+        exmmm = copy.copy(exps[frstmodidx])
         exmmm.dset = 'MMM'
-        exmmm.data = np.ma.average([e.data for e in exps[1:]],axis=0)
+        exmmm.data = np.ma.average([e.data for e in exps[frstmodidx:]],axis=0)
         self.exps.append(exmmm)
         # Products per 3 panels:
         self.ProductPanel = [{'T':['CGLORS','GECCO2','GSOP_GLORYS2V4','GloSea5_GO5'],\
@@ -477,16 +507,15 @@ class Experiments(object):
         ax3 = plt.axes([0.70, 0.1, .2, .8])
         for ia, ax in enumerate([ax1,ax2,ax3]):
             lnes, lgnds = [],[]
-            # WOA13 climatology
-            y = np.ma.hstack((self.exps[0].data,self.exps[0].data[-1]))
-            lnes.append(ax.plot(y,self.exps[0].depth,lw=3,\
-                                drawstyle='steps-pre',color='black')[0])
-            lgnds.append(self.exps[0].dset)
-            # multi-model mean
-            y = np.ma.hstack((self.exps[-1].data,self.exps[-1].data[-1]))
-            lnes.append(ax.plot(y,self.exps[-1].depth,lw=3,linestyle='--',\
-                                drawstyle='steps-pre',color='darkgrey')[0])
-            lgnds.append(self.exps[-1].dset)
+            # 1st observed climatology (Sumata)
+            # 2nd observed climatology (WOA13)
+            # multi-model mean (MMM)
+            for oicol in [(0,'black','-'),(1,'lightgrey','--'),(-1,'darkgrey',':')]:
+                oi, oc, ol = oicol[0], oicol[1], oicol[2]
+                y = np.ma.hstack((self.exps[oi].data,self.exps[oi].data[-1]))
+                lnes.append(ax.plot(y,self.exps[oi].depth,lw=3,linestyle=ol,\
+                                    drawstyle='steps-pre',color=oc)[0])
+                lgnds.append(self.exps[oi].dset)
             # then individual models
             for ename in self.ProductPanel[ia][self.vname]:
                 exp = [e for e in self.exps if e.dset==ename][0]
@@ -495,6 +524,8 @@ class Experiments(object):
                                     drawstyle='steps-pre',color=ModelLineColors[exp.dset])[0])
                 if exp.dset=='GSOP_GLORYS2V4':
                     lgnds.append('GLORYS2V4')
+                elif exp.dset=='GSOP_GLORYS2V3':
+                    lgnds.append('GLORYS2V3')
                 elif exp.dset=='GloSea5_GO5':
                     lgnds.append('GloSea5')
                 elif exp.dset=='EN3v2a':
@@ -504,9 +535,9 @@ class Experiments(object):
                 else:
                     lgnds.append(exp.dset)
             ax.invert_yaxis()
-            ax.set_ylim(4000,0)
+            ax.set_ylim(3000,0)
             if self.vname=='S':
-                ax.set_xlim(32,35)
+                ax.set_xlim(30,35)
             ax.set_ylabel(self.ylabel)
             ax.set_title("%s) %s" % (Alphabets[ia],self.title))
             ax.set_xlabel(self.xlabel)
@@ -524,12 +555,11 @@ class Experiments(object):
         ax3 = plt.axes([0.70, 0.1, .2, .8])
         texps, sexps = self.exps, sxps.exps
         # Calculate how many gridcells we need in the x and y dimensions
-        tmin = np.ma.min([e.data for e in texps])
-        tmax = np.ma.max([e.data for e in texps])
-        smin = np.ma.min([e.data for e in sexps])
-        smax = np.ma.max([e.data for e in sexps])
-        xdim = round((smax-smin)/0.1+1,0)
-        ydim = round((tmax-tmin)/0.1+1,0)
+        tdata = np.ma.hstack([np.ma.array(e.data) for e in texps])
+        sdata = np.ma.hstack([np.ma.array(e.data) for e in sexps])
+        tmin, tmax = np.ma.min(tdata), np.ma.max(tdata)
+        smin, smax = np.ma.min(sdata), np.ma.max(sdata)
+        xdim, ydim = round((smax-smin)/0.1+1,0), round((tmax-tmin)/0.1+1,0)
         # Create empty grid of zeros
         dens = np.zeros((ydim,xdim))
         # Create temp and salt vectors of appropiate dimensions
@@ -545,14 +575,20 @@ class Experiments(object):
             CS = ax.contour(si,ti,dens, linestyles='dashed', colors='k')
             ax.clabel(CS, fontsize=12, inline=1, fmt='%2.1f') # Label every second level
             pnts, lgnds = [],[]
-            # WOA13 climatology
-            t = np.ma.hstack((texps[0].data,texps[0].data[-1]))
-            s = np.ma.hstack((sexps[0].data[1:],sexps[0].data[-1]))
+            lastidx = -2
+            # observed climatology 1
+            t = np.ma.hstack((texps[0].data,texps[0].data[lastidx]))
+            s = np.ma.hstack((sexps[0].data[1:],sexps[0].data[lastidx]))
             pnts.append(ax.scatter(s,t,lw=3,color='black'))
             lgnds.append(texps[0].dset)
+            # observed climatology 2
+            t = np.ma.hstack((texps[1].data,texps[1].data[lastidx]))
+            s = np.ma.hstack((sexps[1].data[1:],sexps[1].data[lastidx]))
+            pnts.append(ax.scatter(s,t,lw=3,color='lightgrey'))
+            lgnds.append(texps[1].dset)
             # multi-model mean
-            t = np.ma.hstack((texps[-1].data,texps[-1].data[-1]))
-            s = np.ma.hstack((sexps[-1].data[1:],sexps[-1].data[-1]))
+            t = np.ma.hstack((texps[-1].data,texps[-1].data[lastidx]))
+            s = np.ma.hstack((sexps[-1].data[1:],sexps[-1].data[lastidx]))
             pnts.append(ax.scatter(s,t,lw=3,color='darkgrey'))
             lgnds.append(texps[-1].dset)
             # then individual models
@@ -562,11 +598,13 @@ class Experiments(object):
                     sexp = [e for e in sexps if e.dset=='EN3v2a'][0]
                 else:
                     sexp = [e for e in sexps if e.dset==ename][0]
-                t = np.ma.hstack((texp.data,texp.data[-1]))
-                s = np.ma.hstack((sexp.data[1:],sexp.data[-1]))
+                t = np.ma.hstack((texp.data,texp.data[lastidx]))
+                s = np.ma.hstack((sexp.data[1:],sexp.data[lastidx]))
                 pnts.append(ax.scatter(s,t,lw=3,color=ModelLineColors[texp.dset]))
                 if texp.dset=='GSOP_GLORYS2V4':
                     lgnds.append('GLORYS2V4')
+                elif texp.dset=='GSOP_GLORYS2V3':
+                    lgnds.append('GLORYS2V3')
                 elif texp.dset=='GloSea5_GO5':
                     lgnds.append('GloSea5')
                 elif texp.dset=='EN4.2.0.g10':
@@ -582,28 +620,31 @@ class Experiments(object):
         plt.savefig("S"+self.figfile)
 
 if __name__ == "__main__":
+    from HiroshisArcticTS import Hiroshis
     # lons should be E and lats should be N
-    lon, lat = 10., 88.
+    # General central Arctic point
+    # lon, lat = 10., 88.
+    # Nansen Basin that Marika says is good
     #lon, lat = 100., 83.
-    #lon, lat = 7., 80.
-    #lon, lat = 220., 80.
+    # Amerasian basin
+    lon, lat = 220., 80.
     vname = 'S' # 'T' or 'S'
     models = ['CGLORS', 'ECDA','GloSea5_GO5',\
               'MOVEG2', 'UoR','EN4','GECCO2']
-    Sxperiments = Experiments([WOA13profile(vname,lon,lat)]+ \
-                              [ORAIPprofile(vname,lon,lat,dset=model) \
-                               for model in models]+\
-                              [GSOP_GLORYS2V4profile(vname,lon,lat),\
-                               ORAP5profile(vname,lon,lat),\
-                               TOPAZprofile(vname,lon,lat)])
-    vname = 'T' # 'T' or 'S'
-    Txperiments = Experiments([WOA13profile(vname,lon,lat)]+ \
-                              [ORAIPprofile(vname,lon,lat,dset=model) \
-                               for model in models]+\
-                              [GSOP_GLORYS2V4profile(vname,lon,lat),\
-                               ORAP5profile(vname,lon,lat),\
-                               TOPAZprofile(vname,lon,lat)])
-    for experiments in [Txperiments,Sxperiments]:
+    for vname in ['S','T']:
+        hrs = Hiroshis()
+        hrs.getPoint(lon,lat,vname)
+        woa = WOA13profile(vname,lon,lat)
+        experiments = Experiments([hrs,woa]+ \
+                                  [ORAIPprofile(vname,lon,lat,dset=model) \
+                                   for model in models]+\
+                                  [GSOP_GLORYS2V4profile(vname,lon,lat),\
+                                   ORAP5profile(vname,lon,lat),\
+                                   TOPAZprofile(vname,lon,lat)])
         experiments.plotProfiles()
+        if vname=='S':
+            Sxperiments = experiments
+        else:
+            Txperiments = experiments
     Txperiments.plotTSdiagram(Sxperiments)
     print "Finnished!"
