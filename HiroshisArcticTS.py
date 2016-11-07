@@ -7,13 +7,13 @@ by WOA13 value (which may be nonsense).
 """
 
 import sys
-sys.path.append('/lustre/tmp/uotilap/ORA-IP/annual_mean')
+sys.path.append('/home/uotilap/tiede/ORA-IP/annual_mean')
 import numpy as np
 import netCDF4 as nc
 from plotAnnuaMeanProfile import LevelBounds
 
 class Hiroshis(object):
-    def __init__(self,fn='/lustre/tmp/uotilap/ORA-IP/annual_mean/ts-clim/hiroshis-clim/archive_v12_QC2_3_DPL_checked_2d_season_int-remapbil-oraip.nc'):
+    def __init__(self,fn='./ts-clim/hiroshis-clim/archive_v12_QC2_3_DPL_checked_2d_season_int-remapbil-oraip.nc'):
         self.dset, self.syr, self.eyr = 'Sumata', 1980, 2015
         fp = nc.Dataset(fn)
         self.olon = np.array(fp.variables['lon'][:])

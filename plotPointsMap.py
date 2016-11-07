@@ -41,7 +41,7 @@ m.drawparallels(parallels,labels=[1,0,0,0])
 meridians = np.arange(10.,360.,30.)
 m.drawmeridians(meridians,labels=[0,0,0,1])
 #plot locations
-xp,yp = m([10,100,220],[88,83,80])
+xp,yp = m([10,100,215],[88,84,80])
 m.scatter(xp,yp,color='red',s=60,edgecolors='k')
 # add colorbar
 cb = m.colorbar(im,"right", size="5%", pad='2%')

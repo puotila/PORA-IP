@@ -6,9 +6,6 @@ and Hiroshis or WOA13 1995-2004 profile.
 
 import os
 import sys
-sys.path.insert(1,'/lustre/tmp/uotilap/marnelam/netCDF4-1.2.2-py2.7-linux-x86_64.egg')
-sys.path.insert(1,'/lustre/tmp/uotilap/marnelam/seawater-3.3.4-py2.7.egg')
-#sys.path.insert(1,'/opt/Python/2.7/lib/python2.7/site-packages')
 import re
 import copy
 import glob
@@ -68,7 +65,7 @@ class WOA13profile(object):
     """
     def __init__(self,vname,plon,plat,dset='WOA13',\
                  months=range(1,13),syr=1995,eyr=2004,\
-                 path='/lustre/tmp/uotilap/marnelam/WOA13/'):
+                 path='/home/uotilap/tiede/WOA/2013/'):
         self.dset = dset
         self.vname = vname # T or S
         self.lon = plon
@@ -113,8 +110,7 @@ class ORAIPprofile(object):
     """
     def __init__(self,vname,plon,plat,dset='oraip',\
                  syr=1993,eyr=2009,\
-                 path='/lustre/tmp/uotilap/ORA-IP/annual_mean/'):
-                 #path='/lustre/tmp/marnelam/reanalyses/heat_content/'):
+                 path='/home/uotilap/tiede/ORA-IP/annual_mean/'):
         print "Reading %s" % dset
         self.dset = dset
         if dset=='EN3' and vname=='S':
@@ -301,7 +297,7 @@ class TOPAZprofile(object):
     """
     def __init__(self,vname,plon,plat,dset='TP4',\
                  syr=1993,eyr=2009,\
-                 path='/lustre/tmp/uotilap/ORA-IP/annual_mean/'):
+                 path='/home/uotilap/tiede/ORA-IP/annual_mean/'):
         print "Reading %s" % dset
         self.dset = dset
         self.vname = vname # T or S
@@ -350,7 +346,7 @@ class ORAP5profile(object):
     """
     def __init__(self,vname,plon,plat,dset='ORAP5',\
                  syr=1993,eyr=2009,\
-                 path='/lustre/tmp/uotilap/ORA-IP/annual_mean/'):
+                 path='/home/uotilap/tiede/ORA-IP/annual_mean/'):
         print "Reading %s" % dset
         self.dset = dset
         self.vname = vname # T or S
@@ -402,7 +398,7 @@ class GSOP_GLORYS2V4profile(object):
     """
     def __init__(self,vname,plon,plat,dset='GSOP_GLORYS2V4',\
                  syr=1993,eyr=2009,\
-                 path='/lustre/tmp/uotilap/ORA-IP/annual_mean/'):
+                 path='/home/uotilap/tiede/ORA-IP/annual_mean/'):
         print "Reading %s" % dset
         self.dset = dset
         self.vname = vname # T or S
@@ -460,7 +456,7 @@ class GSOP_GLORYS2V4profile(object):
 class GSOP_GLORYS2V3profile(GSOP_GLORYS2V4profile):
     def __init__(self,vname,plon,plat,dset='GSOP_GLORYS2V3',\
                  syr=1993,eyr=2009,\
-                 path='/lustre/tmp/uotilap/ORA-IP/annual_mean/'):
+                 path='/home/uotilap/tiede/ORA-IP/annual_mean/'):
         super( GSOP_GLORYS2V3profile, self).__init__(vname,plon,plat,\
                                                      dset=dset,\
                                                      syr=syr,eyr=eyr,\
