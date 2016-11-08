@@ -43,6 +43,7 @@ class Product(object):
                  path='/home/uotilap/tiede/ORA-IP/annual_mean/',\
                  level_bounds=None):
         self.path = path
+        # modify so that plot and plat can be arrays of one or more values
         self.plon, self.plat = plon, plat
         self.syr, self.eyr = syr, eyr
         self.LevelBounds = {}
@@ -107,7 +108,7 @@ class Product(object):
     def getDates(self,fp):
         time = fp.variables[self.nctimename]
         if hasattr(time,'calendar'):
-            cdftime = utime(time.units,calendar=time.calendar)
+            cdftime = utime(time.units,calendar=time.calendar.lower())
         else:
             cdftime = utime(time.units)
         return [cdftime.num2date(t) for t in time[:]]
@@ -211,7 +212,7 @@ class ECDA(Product):
         else:
             time = fp.variables[self.nctimename.upper()]
         if hasattr(time,'calendar'):
-            cdftime = utime(time.units,calendar=time.calendar)
+            cdftime = utime(time.units,calendar=time.calendar.lower())
         else:
             cdftime = utime(time.units)
         return [cdftime.num2date(t) for t in time[:]]
