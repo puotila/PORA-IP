@@ -12,7 +12,7 @@ import glob
 import string
 import numpy as np
 import matplotlib as mpl
-mpl.use('Agg')
+#mpl.use('Agg')
 import matplotlib.pyplot as plt
 import netCDF4 as nc
 from datetime import datetime
@@ -34,7 +34,7 @@ class ProfVar(object):
         # lower level depth
         self.lz = level_bounds[:,1]
         # middle level depth
-        self.mz = np.average(level_bounds,axis=1)
+        self.mz = np.mean(level_bounds,axis=1)
 
 class Product(object):
     """ ORAIP annual means of T and S for the basin-average profile.
@@ -174,6 +174,10 @@ class Product(object):
                               ((lon>315) & (lon<=330) & (lat<=-62)))
         elif self.basin=='Arctic':
             iy, ix = np.where(lat>80)
+        elif self.basin=='Nansen':
+            iy, ix = np.where(((lon<135) & (lat>80))| ((lon>315) & (lat>80)))
+        elif self.basin=='Canadian':
+            iy, ix = np.where((lon>=135) & (lon<=315) & (lat>80))
         else:
             print "%s basin has not been defined!" % self.basin
             sys.exit(0)
@@ -227,7 +231,7 @@ class Product(object):
             iz = np.where((depth>=lb[0])&(depth<lb[1]))
             data1 = data[iz]
             data2 = data1[~np.isnan(data1)]
-            ldata.append(np.ma.average(data2))
+            ldata.append(np.ma.mean(data2))
         return np.ma.array(ldata,mask=np.isnan(ldata))
 
 class CGLORS(Product):
@@ -283,7 +287,7 @@ class CGLORS(Product):
                        data_ba = np.ma.mean(data,axis=tuple(range(1, data.ndim)))
                        tdata.append(self.getLayeredDepthProfile(varname,depth,data_ba))
                 fp.close()
-            pdata.data = np.ma.average(tdata,axis=0) # temporal average
+            pdata.data = np.ma.mean(tdata,axis=0) # temporal average
 
 class ECDA(Product):
     def __init__(self,basin,syr,eyr):
@@ -362,7 +366,8 @@ class UoR(Product):
 class EN4(Product):
     def __init__(self,basin,syr,eyr):
         super( EN4, self).__init__(basin,syr,eyr)
-        self.dset  = self.legend = 'EN4'
+        self.dset  = 'EN4'
+        self.legend = 'EN4.2.0.g10'
         self.dsyr, self.deyr = 1950, 2015
         self.fpat = "EN4.2.0.g10_int%s_annmean_%dto%d_%d-%dm.nc"
         self.ncvarname = {'T':'t_int_',\
@@ -424,10 +429,7 @@ class GECCO2(Product):
         # read temperature profile
         data['T'] = self.readVarProfile('T')
         data = self.maskBadSalinity(data)
-        for varname in ['S','T']:
-            pdata = getattr(self,varname)
-            pdata.data = np.ma.mean(data[varname],\
-                         axis=tuple(range(1,data[varname].ndim))) # time and basin average
+        self.averageBasinAndTime(data)
 
     def readGECCO2TemperatureProfile(self,varname='T'):
         tdata = [] # [z,t,y,x]
@@ -566,7 +568,7 @@ class TOPAZ(Product):
                     data     = np.ma.masked_values(data, FillValue)*basinmask
                     data_ba  = np.ma.mean(data,axis=tuple(range(1, data.ndim)))
                     tdata.append(self.getLayeredDepthProfile(varname,depth,data_ba))
-            pdata.data = np.ma.average(tdata,axis=0)
+            pdata.data = np.ma.mean(tdata,axis=0)
 
 class MultiModelMean(Product):
     def __init__(self,basin):
@@ -577,7 +579,7 @@ class MultiModelMean(Product):
 
     def calcMultiModelMean(self,products,vname):
         setattr(getattr(self,vname),'data',\
-                np.ma.average([getattr(getattr(p,vname),'data')\
+                np.ma.mean([getattr(getattr(p,vname),'data')\
                 for p in products],axis=0))
 
 class Sumata(Product):
@@ -615,7 +617,7 @@ class Sumata(Product):
                 data    = np.ma.masked_values(ncvar[i],FillValue)*basinmask
                 data_ba = np.ma.mean(data,axis=tuple(range(1, data.ndim)))
                 tdata.append(self.getLayeredDepthProfile(varname,depth,data_ba))
-            pdata.data = np.ma.average(tdata,axis=0)
+            pdata.data = np.ma.mean(tdata,axis=0)
         fp.close()
 
 class WOA13(Sumata):
@@ -676,7 +678,7 @@ class ORAP5(Product):
                     data_ba = np.ma.mean(data,axis=tuple(range(1, data.ndim)))
                     tdata.append(self.getLayeredDepthProfile(varname,depth,data_ba))
             fp.close()
-            pdata.data = np.ma.average(tdata,axis=0)
+            pdata.data = np.ma.mean(tdata,axis=0)
 
 class MOVEG2i(Product):
     def __init__(self,basin,syr,eyr):
@@ -730,7 +732,7 @@ class MOVEG2i(Product):
                     data_ba = np.ma.mean(data,axis=tuple(range(1, data.ndim)))
                     tdata.append(self.getLayeredDepthProfile(varname,depth,data_ba))
             fp.close()
-            pdata.data = np.ma.average(tdata,axis=0)
+            pdata.data = np.ma.mean(tdata,axis=0)
 
 class SODA331(Product):
     def __init__(self,basin,syr,eyr):
@@ -780,7 +782,7 @@ class SODA331(Product):
                        data_ba = np.ma.mean(data,axis=tuple(range(1, data.ndim)))
                        tdata.append(self.getLayeredDepthProfile(varname,depth,data_ba))
                 fp.close()
-            pdata.data = np.ma.average(tdata,axis=0)
+            pdata.data = np.ma.mean(tdata,axis=0)
 
 class Products(object):
     """ Container for ORA-IP products
@@ -822,7 +824,10 @@ class Products(object):
         self.woa13.readProfile()
 
     def getMultiModelMean(self,vname):
-        self.mmm.calcMultiModelMean(self.products,vname)
+        """ EN4 is not a part of MMM!
+        """
+        products = [product for product in self.products if product.dset not in ['EN4']]
+        self.mmm.calcMultiModelMean(products,vname)
 
     def getDataRange(self,vname):
         if self.basin in ['Antarctic']:
@@ -982,7 +987,8 @@ class Products(object):
         plt.savefig('./basin_avg/TS_'+self.fileout+'.pdf')
 
 if __name__ == "__main__":
-    for basin in ['Antarctic','Arctic']:
+    #for basin in ['Antarctic','Arctic','Nanse','Canadian']:
+    for basin in ['Canadian','Nansen']:
         if basin in ['Antarctic']:
             prset = Products([UoR,GloSea5,MOVEG2i,GECCO2,EN4,\
                               ECDA,ORAP5,GLORYS2V4,CGLORS,SODA331],basin)
