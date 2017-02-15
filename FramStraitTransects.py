@@ -12,28 +12,13 @@ import matplotlib.pyplot as plt
 import cmocean
 
 from PORAIPHydrography import Products, UoR, MultiModelMean, WOA13, Sumata
-from PORAIPHydrography import GloSea5, MOVEG2, GECCO2, EN4
-from PORAIPHydrography import ECDA, ORAP5, TOPAZ, GLORYS2V4, CGLORS
+from PORAIPHydrography import GloSea5, MOVEG2i, GECCO2, EN4
+from PORAIPHydrography import ECDA, ORAP5, SODA331, TOPAZ, GLORYS2V4, CGLORS
 
 class Transect(object):
-    def __init__(self,products,vname,lons,lats):
-        self.vname = vname
-        if self.vname=='T':
-            self.ccmap = cmocean.cm.thermal
-        else:
-            self.ccmap = cmocean.cm.haline
-        self.lons, self.lats = lons, lats
-        self.prset = {}
-        for li, lon in enumerate(lons):
-            self.prset[lon] = {}
-            lat = lats[li]
-            if lon<0:
-                lonin = lon + 360
-            else:
-                lonin = lon
-            self.prset[lon][lat] = Products(products,lonin,lat)
-            self.prset[lon][lat].readProfiles(vname)
-            self.prset[lon][lat].getMultiModelMean(vname)
+    def __init__(self,products):
+        self.prset = prset
+        self.prset.readTransects()
 
     def findProduct(self,product):
         prodpoint = self.prset[self.lons[0]][self.lats[0]]
@@ -114,24 +99,20 @@ class Transect(object):
         plt.savefig("fstransect_%s.png" % self.vname)
 
 if __name__ == "__main__":
-    # Fram Strait collection of points
-    lons = np.arange(-20.5,11,1)
-    lats = np.array([79]*len(lons))
-    products = [UoR,GloSea5,MOVEG2,GECCO2,EN4,\
-                ECDA,ORAP5,GLORYS2V4,CGLORS]
-    #products = [UoR]
-    vname = 'S'
-    fileout = "fstransect_%s" % vname
+    prset = Products([UoR,GloSea5,MOVEG2i,GECCO2,EN4,\
+                      ECDA,ORAP5,GLORYS2V4,CGLORS,SODA331,TOPAZ],'Fram Strait')
+    #prset = Products([MOVEG2i,GECCO2,ORAP5,CGLORS,SODA331,TOPAZ],'Fram Strait')
+    fileout = "fstransect"
     cpzfile = fileout+'.cpickle.gz'
     if os.path.exists(cpzfile):
         fp = gzip.open(cpzfile)
         fstransect = cPickle.load(fp)
         fp.close()
     else:
-        fstransect = Transect(products,vname,lons,lats)
+        fstransect = Transect(prset)
         fp = gzip.open(cpzfile,'w')
         cPickle.dump(fstransect,fp)
         fp.close()
     # plotting
-    fstransect.plotTransects(products)
+    fstransect.plotTransects(prset)
     print "Finnished!"

@@ -138,6 +138,20 @@ class Product(object):
         data = self.maskBadSalinity(data)
         self.averageBasinAndTime(data)
 
+    def readTransect(self,maxis=(1,2)):
+        """ varname is either T or S
+        """
+        data = {'T':[],'S':[]} # [z,t,y,x]
+        for varname in ['S','T']:
+            data[varname] = self.readVarProfile(varname)
+        data = self.maskBadSalinity(data)
+        # average according to maxis (leaving transect)
+        # maxis = (1,2) would be a time-average of a meridional transect
+        for varname in ['S','T']:
+            pdata = getattr(self,varname)
+            pdata.data = np.ma.mean(data[varname],\
+                         axis=maxis) # time and basin average
+
     def readLatLon(self,fp):
         lat = np.array(fp.variables[self.nclatname][:])
         lon = np.array(fp.variables[self.nclonname][:])
@@ -175,9 +189,11 @@ class Product(object):
         elif self.basin=='Arctic':
             iy, ix = np.where(lat>80)
         elif self.basin=='Nansen':
-            iy, ix = np.where(((lon<135) & (lat>80))| ((lon>315) & (lat>80)))
+            iy, ix = np.where(((lon<135) & (lat>80)) | ((lon>315) & (lat>80)))
         elif self.basin=='Canadian':
             iy, ix = np.where((lon>=135) & (lon<=315) & (lat>80))
+        elif self.basin=='Fram Strait':
+            iy, ix = np.where(((lon>339) | (lon<11)) & ((lat>78) & (lat<80)))
         else:
             print "%s basin has not been defined!" % self.basin
             sys.exit(0)
@@ -224,14 +240,17 @@ class Product(object):
         """
         Average 3D hires profile data according to level_bounds
         """
-        if data.ndim>1:
-            print "Warning: basin average has %d dimensions!" % data.ndim
+        #if data.ndim>1:
+        #    print "Warning: basin average has %d dimensions!" % data.ndim
         ldata    = []
         for li, lb in enumerate(self.LevelBounds[varname]):
             iz = np.where((depth>=lb[0])&(depth<lb[1]))
-            data1 = data[iz]
-            data2 = data1[~np.isnan(data1)]
-            ldata.append(np.ma.mean(data2))
+            #data1 = data[iz]
+            #data2 = data1[~np.isnan(data1)]
+            if data.ndim==1:
+                ldata.append(np.ma.mean(data[iz])) # depth average
+            else:
+                ldata.append(np.ma.mean(data[iz],axis=0)) # depth average, not basin average
         return np.ma.array(ldata,mask=np.isnan(ldata))
 
 class CGLORS(Product):
@@ -288,6 +307,34 @@ class CGLORS(Product):
                        tdata.append(self.getLayeredDepthProfile(varname,depth,data_ba))
                 fp.close()
             pdata.data = np.ma.mean(tdata,axis=0) # temporal average
+
+    def readTransect(self,maxis=(0,1)):
+        """ varname is either T or S
+        Read data from a netCDF file and return its temporal mean
+        """
+        for varname in ['S','T']:
+            pdata = getattr(self,varname)
+            ncvarname = self.ncvarname[varname]
+            tdata = []
+            for year in range(self.syr,self.eyr+1):
+                fn, ncdepthname = self.getNetCDFfilename(varname,year)
+                fp = self.getNetCDFfilepointer(fn)
+                lon, lat = self.readLatLon(fp)
+                dates    = self.getDates(fp,year)
+                depth    = np.array(fp.variables[ncdepthname])
+                basinmask = self.findBasinIndex(lon,lat)
+                ncvar    = fp.variables[ncvarname]
+                FillValue = self.getFillValue(ncvar)
+                for i,date in enumerate(dates[:]):
+                    if date.year in range(self.syr,self.eyr+1):
+                       data = np.ma.array(fp.variables[ncvarname][i])
+                       if FillValue is None:
+                           data *= basinmask
+                       else:
+                           data  = np.ma.masked_values(data, FillValue)*basinmask
+                       tdata.append(self.getLayeredDepthProfile(varname,depth,data))
+                fp.close()
+            pdata.data = np.ma.mean(tdata,axis=maxis) # temporal average
 
 class ECDA(Product):
     def __init__(self,basin,syr,eyr):
@@ -375,26 +422,22 @@ class EN4(Product):
         self.linecolor = self.scattercolor = 'pink'
         self.bathymetry = self.bathymetry[7:,:]
 
-    def readProfile(self):
+    def readVarProfile(self,varname):
         """ varname is either T or S
         """
-        data = {'T':[],'S':[]} # [z,t,x,y]
-        for varname in ['S','T']:
-            mdata = []
-            for li, lb in enumerate(self.LevelBounds[varname]):
-                ncvarname = "%s%d" % (self.ncvarname[varname],lb[1])
-                fn    = self.getNetCDFfilename(varname,0,lb[1])
-                ldata = self.readOneFile(fn,ncvarname,lb[1])
-                if lb[0]==0.:
-                    udata = 0.0*ldata
-                else:
-                    ncvarname = "%s%d" % (self.ncvarname[varname],lb[0])
-                    fn    = self.getNetCDFfilename(varname,0,lb[0])
-                    udata = self.readOneFile(fn,ncvarname,lb[0])
-                mdata.append((ldata - udata)/(lb[1] - lb[0])) # [t,x,y] variable values from level averages
-            data[varname] = np.ma.array(mdata) # [z,t,x,y]
-        data = self.maskBadSalinity(data)
-        self.averageBasinAndTime(data)
+        data = []
+        for li, lb in enumerate(self.LevelBounds[varname]):
+            ncvarname = "%s%d" % (self.ncvarname[varname],lb[1])
+            fn    = self.getNetCDFfilename(varname,0,lb[1])
+            ldata = self.readOneFile(fn,ncvarname,lb[1])
+            if lb[0]==0.:
+                udata = 0.0*ldata
+            else:
+                ncvarname = "%s%d" % (self.ncvarname[varname],lb[0])
+                fn    = self.getNetCDFfilename(varname,0,lb[0])
+                udata = self.readOneFile(fn,ncvarname,lb[0])
+            data.append((ldata - udata)/(lb[1] - lb[0])) # [t,x,y] variable values from level averages
+        return np.ma.array(data) # [z,t,x,y]
 
 class GECCO2(Product):
     def __init__(self,basin,syr,eyr):
@@ -430,6 +473,19 @@ class GECCO2(Product):
         data['T'] = self.readVarProfile('T')
         data = self.maskBadSalinity(data)
         self.averageBasinAndTime(data)
+
+    def readGECCO2Transect(self,maxis=(1,2)):
+        data = {'T':[],'S':[]} # [z,t,y,x]
+        data['S'] = self.readGECCO2SalinityProfile()
+        # read temperature profile
+        data['T'] = self.readVarProfile('T')
+        data = self.maskBadSalinity(data)
+        # average according to maxis (leaving transect)
+        # maxis = (1,2) would be a time-average of a meridional transect
+        for varname in ['S','T']:
+            pdata = getattr(self,varname)
+            pdata.data = np.ma.mean(data[varname],\
+                         axis=maxis) # time and basin average
 
     def readGECCO2TemperatureProfile(self,varname='T'):
         tdata = [] # [z,t,y,x]
@@ -546,6 +602,20 @@ class TOPAZ(Product):
             fn = self.fpat % ('salt',year,month)
         return fn
 
+    def readMonthlyVar(self,varname,year,month):
+        fn = self.getNetCDFfilename(varname,year,month)
+        fp = self.getNetCDFfilepointer(fn)
+        lon, lat = self.readLatLon(fp)
+        depth    = np.array(fp.variables[self.ncdepthname])
+        basinmask= self.findBasinIndex(lon,lat)
+        ncvarname = self.ncvarname[varname]
+        ncvar    = fp.variables[ncvarname]
+        FillValue = self.getFillValue(ncvar)
+        data     = np.ma.array(fp.variables[ncvarname])
+        data     = np.ma.masked_values(data, FillValue)*basinmask
+        fp.close()
+        return data, depth
+
     def readProfile(self):
         """ varname is either T or S
         Read data from a netCDF file and return its temporal mean
@@ -553,21 +623,26 @@ class TOPAZ(Product):
         """
         for varname in ['S','T']:
             pdata = getattr(self,varname)
-            ncvarname = self.ncvarname[varname]
             tdata = []
             for year in range(self.syr,self.eyr+1):
                 for month in range(1,13):
-                    fn = self.getNetCDFfilename(varname,year,month)
-                    fp = self.getNetCDFfilepointer(fn)
-                    lon, lat = self.readLatLon(fp)
-                    depth    = np.array(fp.variables[self.ncdepthname])
-                    basinmask= self.findBasinIndex(lon,lat)
-                    ncvar    = fp.variables[ncvarname]
-                    FillValue = self.getFillValue(ncvar)
-                    data     = np.ma.array(fp.variables[ncvarname])
-                    data     = np.ma.masked_values(data, FillValue)*basinmask
+                    data, depth = self.readMonthlyVar(varname,year,month)
                     data_ba  = np.ma.mean(data,axis=tuple(range(1, data.ndim)))
                     tdata.append(self.getLayeredDepthProfile(varname,depth,data_ba))
+            pdata.data = np.ma.mean(tdata,axis=0)
+
+    def readTransect(self):
+        """ varname is either T or S
+        Read data from a netCDF file and return its temporal mean
+        for the basin-averaged profile.
+        """
+        for varname in ['S','T']:
+            pdata = getattr(self,varname)
+            tdata = []
+            for year in range(self.syr,self.eyr+1):
+                for month in range(1,13):
+                    data, depth = self.readMonthlyVar(varname,year,month)
+                    tdata.append(self.getLayeredDepthProfile(varname,depth,data))
             pdata.data = np.ma.mean(tdata,axis=0)
 
 class MultiModelMean(Product):
@@ -617,6 +692,30 @@ class Sumata(Product):
                 data    = np.ma.masked_values(ncvar[i],FillValue)*basinmask
                 data_ba = np.ma.mean(data,axis=tuple(range(1, data.ndim)))
                 tdata.append(self.getLayeredDepthProfile(varname,depth,data_ba))
+            pdata.data = np.ma.mean(tdata,axis=0)
+        fp.close()
+
+    def readTransect(self):
+        """ varname is either T or S
+        Read data from a netCDF file and return its temporal mean
+        for the basin-averaged profile.
+        """
+        fn = self.getNetCDFfilename()
+        fp = self.getNetCDFfilepointer(fn)
+        lon, lat  = self.readLatLon(fp)
+        depth     = np.array(fp.variables[self.ncdepthname])
+        basinmask = self.findBasinIndex(lon,lat)
+        for varname in ['S','T']:
+            ncvarname = self.ncvarname[varname]
+            ncvar     = fp.variables[ncvarname]
+            FillValue = self.getFillValue(ncvar)
+            pdata = getattr(self,varname)
+            tdata = []
+            # if seasonal average is not representative we may
+            # need to plot seasons separately
+            for i in range(4):
+                data    = np.ma.masked_values(ncvar[i],FillValue)*basinmask
+                tdata.append(self.getLayeredDepthProfile(varname,depth,data))
             pdata.data = np.ma.mean(tdata,axis=0)
         fp.close()
 
@@ -680,6 +779,30 @@ class ORAP5(Product):
             fp.close()
             pdata.data = np.ma.mean(tdata,axis=0)
 
+    def readTransect(self):
+        """ varname is either T or S
+        Read data from a netCDF file and return its temporal mean
+        for the basin-averaged profile.
+        """
+        for varname in ['S','T']:
+            fn = self.getNetCDFfilename(varname)
+            fp = self.getNetCDFfilepointer(fn)
+            lon, lat  = self.readLatLon(fp)
+            dates     = self.getDates(fp)
+            depth     = np.array(fp.variables[self.ncdepthname])
+            basinmask = self.findBasinIndex(lon,lat)
+            ncvarname = self.ncvarname[varname]
+            ncvar     = fp.variables[ncvarname]
+            FillValue = self.getFillValue(ncvar)
+            pdata     = getattr(self,varname)
+            tdata     = []
+            for i,date in enumerate(dates[:]):
+                if date.year in range(self.syr,self.eyr+1):
+                    data    = np.ma.masked_values(ncvar[i],FillValue)*basinmask
+                    tdata.append(self.getLayeredDepthProfile(varname,depth,data))
+            fp.close()
+            pdata.data = np.ma.mean(tdata,axis=0)
+
 class MOVEG2i(Product):
     def __init__(self,basin,syr,eyr):
         super( MOVEG2i, self).__init__(basin,syr,eyr)
@@ -734,6 +857,33 @@ class MOVEG2i(Product):
             fp.close()
             pdata.data = np.ma.mean(tdata,axis=0)
 
+    def readTransect(self,maxis=(0,2)):
+        """ varname is either T or S
+        Read data from a netCDF file and return its temporal mean
+        for the basin-averaged profile.
+        """
+        for varname in ['S','T']:
+            fn = self.getNetCDFfilename(varname)
+            fp = self.getNetCDFfilepointer(fn)
+            lon, lat  = self.readLatLon(fp)
+            dates     = self.getDates(fp)
+            depth     = np.array(fp.variables[self.ncdepthname])
+            basinmask = self.findBasinIndex(lon,lat)
+            ncvarname = self.ncvarname[varname]
+            ncvar     = fp.variables[ncvarname]
+            FillValue = self.getFillValue(ncvar)
+            pdata     = getattr(self,varname)
+            tdata     = []
+            for i,date in enumerate(dates[:]):
+                if date.year in range(self.syr,self.eyr+1):
+                    data    = np.ma.masked_values(ncvar[i],FillValue)*basinmask
+                    # Note that data is (nz,ny,nx) and basinmask (ny,nx)
+                    # their multiplication data*basinmask returns (nz,ny,nz) where
+                    # each data[nz] is multiplied by basinmask, clever eh?
+                    tdata.append(self.getLayeredDepthProfile(varname,depth,data))
+            fp.close()
+            pdata.data = np.ma.mean(tdata,axis=maxis)
+
 class SODA331(Product):
     def __init__(self,basin,syr,eyr):
         super( SODA331, self).__init__(basin,syr,eyr)
@@ -784,6 +934,31 @@ class SODA331(Product):
                 fp.close()
             pdata.data = np.ma.mean(tdata,axis=0)
 
+    def readTransect(self,maxis=(0,1)):
+        """ varname is either T or S
+        Read data from a netCDF file and return its temporal mean
+        for the basin-averaged profile.
+        """
+        for varname in ['S','T']:
+            pdata = getattr(self,varname)
+            ncvarname = self.ncvarname[varname]
+            tdata = []
+            for year in range(self.syr,self.eyr+1):
+                fn = self.getNetCDFfilename(varname,year)
+                fp = self.getNetCDFfilepointer(fn)
+                lon, lat = self.readLatLon(fp)
+                dates    = self.getDates(fp,year)
+                depth    = np.array(fp.variables[self.ncdepthname])
+                basinmask= self.findBasinIndex(lon,lat)
+                ncvar    = fp.variables[ncvarname]
+                FillValue = self.getFillValue(ncvar)
+                for i,date in enumerate(dates[:]):
+                    if date.year in range(self.syr,self.eyr+1):
+                       data    = np.ma.masked_values(ncvar[i],FillValue)*basinmask
+                       tdata.append(self.getLayeredDepthProfile(varname,depth,data))
+                fp.close()
+            pdata.data = np.ma.mean(tdata,axis=maxis)
+
 class Products(object):
     """ Container for ORA-IP products
     """
@@ -822,6 +997,19 @@ class Products(object):
         if self.basin not in ['Antarctic']:
             self.sumata.readProfile()
         self.woa13.readProfile()
+
+    def readTransects(self):
+        """ Reads now both T and S transects
+        """
+        for product in self.products:
+            if product.dset=='GECCO2':
+                product.readGECCO2Transect()
+            else:
+                product.readTransect()
+            print product.S.data.shape
+        if self.basin not in ['Antarctic']:
+            self.sumata.readTransect()
+        self.woa13.readTransect()
 
     def getMultiModelMean(self,vname):
         """ EN4 is not a part of MMM!
@@ -988,7 +1176,7 @@ class Products(object):
 
 if __name__ == "__main__":
     #for basin in ['Antarctic','Arctic','Nanse','Canadian']:
-    for basin in ['Canadian','Nansen']:
+    for basin in ['Canadian']:
         if basin in ['Antarctic']:
             prset = Products([UoR,GloSea5,MOVEG2i,GECCO2,EN4,\
                               ECDA,ORAP5,GLORYS2V4,CGLORS,SODA331],basin)
