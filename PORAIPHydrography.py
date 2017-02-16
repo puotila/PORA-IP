@@ -12,7 +12,7 @@ import glob
 import string
 import numpy as np
 import matplotlib as mpl
-#mpl.use('Agg')
+mpl.use('Agg')
 import matplotlib.pyplot as plt
 import netCDF4 as nc
 from datetime import datetime
@@ -251,7 +251,9 @@ class Product(object):
                 ldata.append(np.ma.mean(data[iz])) # depth average
             else:
                 ldata.append(np.ma.mean(data[iz],axis=0)) # depth average, not basin average
-        return np.ma.array(ldata,mask=np.isnan(ldata))
+            nanmask = np.ma.make_mask(np.isnan(ldata))
+            lmask = np.ma.mask_or(np.ma.array(ldata).mask,nanmask)
+        return np.ma.array(ldata,mask=lmask)
 
 class CGLORS(Product):
     def __init__(self,basin,syr,eyr):
@@ -308,7 +310,7 @@ class CGLORS(Product):
                 fp.close()
             pdata.data = np.ma.mean(tdata,axis=0) # temporal average
 
-    def readTransect(self,maxis=(0,1)):
+    def readTransect(self,maxis=(0,2)):
         """ varname is either T or S
         Read data from a netCDF file and return its temporal mean
         """
@@ -631,7 +633,7 @@ class TOPAZ(Product):
                     tdata.append(self.getLayeredDepthProfile(varname,depth,data_ba))
             pdata.data = np.ma.mean(tdata,axis=0)
 
-    def readTransect(self):
+    def readTransect(self,maxis=(0,2)):
         """ varname is either T or S
         Read data from a netCDF file and return its temporal mean
         for the basin-averaged profile.
@@ -643,7 +645,7 @@ class TOPAZ(Product):
                 for month in range(1,13):
                     data, depth = self.readMonthlyVar(varname,year,month)
                     tdata.append(self.getLayeredDepthProfile(varname,depth,data))
-            pdata.data = np.ma.mean(tdata,axis=0)
+            pdata.data = np.ma.mean(tdata,axis=maxis)
 
 class MultiModelMean(Product):
     def __init__(self,basin):
@@ -652,10 +654,10 @@ class MultiModelMean(Product):
         self.linecolor = self.scattercolor = self.edgecolor = 'lightgrey'
         self.linestyle = ':'
 
-    def calcMultiModelMean(self,products,vname):
+    def calcMultiModelMean(self,products,vname,maxis=(0,)):
         setattr(getattr(self,vname),'data',\
                 np.ma.mean([getattr(getattr(p,vname),'data')\
-                for p in products],axis=0))
+                for p in products],axis=maxis))
 
 class Sumata(Product):
     def __init__(self,basin,syr=1980,eyr=2015):
@@ -695,7 +697,7 @@ class Sumata(Product):
             pdata.data = np.ma.mean(tdata,axis=0)
         fp.close()
 
-    def readTransect(self):
+    def readTransect(self,maxis=(0,2)):
         """ varname is either T or S
         Read data from a netCDF file and return its temporal mean
         for the basin-averaged profile.
@@ -716,7 +718,7 @@ class Sumata(Product):
             for i in range(4):
                 data    = np.ma.masked_values(ncvar[i],FillValue)*basinmask
                 tdata.append(self.getLayeredDepthProfile(varname,depth,data))
-            pdata.data = np.ma.mean(tdata,axis=0)
+            pdata.data = np.ma.mean(tdata,axis=maxis)
         fp.close()
 
 class WOA13(Sumata):
@@ -779,7 +781,7 @@ class ORAP5(Product):
             fp.close()
             pdata.data = np.ma.mean(tdata,axis=0)
 
-    def readTransect(self):
+    def readTransect(self,maxis=(0,2)):
         """ varname is either T or S
         Read data from a netCDF file and return its temporal mean
         for the basin-averaged profile.
@@ -801,7 +803,7 @@ class ORAP5(Product):
                     data    = np.ma.masked_values(ncvar[i],FillValue)*basinmask
                     tdata.append(self.getLayeredDepthProfile(varname,depth,data))
             fp.close()
-            pdata.data = np.ma.mean(tdata,axis=0)
+            pdata.data = np.ma.mean(tdata,axis=maxis)
 
 class MOVEG2i(Product):
     def __init__(self,basin,syr,eyr):
@@ -934,7 +936,7 @@ class SODA331(Product):
                 fp.close()
             pdata.data = np.ma.mean(tdata,axis=0)
 
-    def readTransect(self,maxis=(0,1)):
+    def readTransect(self,maxis=(0,2)):
         """ varname is either T or S
         Read data from a netCDF file and return its temporal mean
         for the basin-averaged profile.
@@ -1009,13 +1011,15 @@ class Products(object):
             print product.S.data.shape
         if self.basin not in ['Antarctic']:
             self.sumata.readTransect()
+            print self.sumata.S.data.shape
         self.woa13.readTransect()
+        print self.sumata.S.data.shape
 
-    def getMultiModelMean(self,vname):
+    def getMultiModelMean(self,vname,maxis=(0,)):
         """ EN4 is not a part of MMM!
         """
         products = [product for product in self.products if product.dset not in ['EN4']]
-        self.mmm.calcMultiModelMean(products,vname)
+        self.mmm.calcMultiModelMean(products,vname,maxis=maxis)
 
     def getDataRange(self,vname):
         if self.basin in ['Antarctic']:
@@ -1175,8 +1179,8 @@ class Products(object):
         plt.savefig('./basin_avg/TS_'+self.fileout+'.pdf')
 
 if __name__ == "__main__":
-    #for basin in ['Antarctic','Arctic','Nanse','Canadian']:
-    for basin in ['Canadian']:
+    for basin in ['Antarctic','Arctic','Nansen','Canadian']:
+    #for basin in ['Canadian']:
         if basin in ['Antarctic']:
             prset = Products([UoR,GloSea5,MOVEG2i,GECCO2,EN4,\
                               ECDA,ORAP5,GLORYS2V4,CGLORS,SODA331],basin)
