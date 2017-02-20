@@ -12,7 +12,7 @@ import glob
 import string
 import numpy as np
 import matplotlib as mpl
-mpl.use('Agg')
+#mpl.use('Agg')
 import matplotlib.pyplot as plt
 import netCDF4 as nc
 from datetime import datetime
@@ -57,6 +57,11 @@ class Product(object):
         else:
             self.LevelBounds = level_bounds
         self.bathymetry = self.readWOA13Bathymetry()
+        if basin in ['Arctic,','Nansen','Canadian']:
+            """ data in shallower than mindpth are excluded
+            """
+            ib = np.where(self.bathymetry<500)
+            self.bathymetry[ib] = 0.
         for vname in ['T','S']:
             setattr(self,vname,ProfVar(vname,self.LevelBounds[vname]))
         self.nclatname, self.nclonname    = 'lat', 'lon'
@@ -181,18 +186,29 @@ class Product(object):
         if self.basin=='Antarctic':
             # Antarctic shelf/deep regions
             iy, ix = np.where(((lon>330) & (lon<=360) & (lat<=-60)) | ((lon>0) & (lon<=35) & (lat<=-60))    |
-                              ((lon>35) & (lon<=68) & (lat<=-61)) | ((lon>68) & (lon<=95) & (lat<=-60))     |
-                              ((lon>95) & (lon<=110) & (lat<=-62)) | ((lon>110) & (lon<=160) & (lat<=-64))  |
+                              ((lon>35)  & (lon<=68) & (lat<=-61))  | ((lon>68) & (lon<=95) & (lat<=-60))   |
+                              ((lon>95)  & (lon<=110) & (lat<=-62)) | ((lon>110) & (lon<=160) & (lat<=-64)) |
                               ((lon>160) & (lon<=235) & (lat<=-66)) | ((lon>235) & (lon<=280) & (lat<=-68)) |
                               ((lon>280) & (lon<=300) & (lat<=-66)) | ((lon>300) & (lon<=315) & (lat<=-64)) |
                               ((lon>315) & (lon<=330) & (lat<=-62)))
         elif self.basin=='Arctic':
-            iy, ix = np.where(lat>80)
+            iy, ix = np.where(((lon>100) & (lon<250) & (lat>70)) |
+                              ((lon<=100) & (lat>80)) |
+                              ((lon>=250) & (lat>80)))
         elif self.basin=='Nansen':
-            iy, ix = np.where(((lon<135) & (lat>80)) | ((lon>315) & (lat>80)))
+            #iy, ix = np.where(((lon<135) & (lat>80)) | ((lon>315) & (lat>80)))
+            iy, ix = np.where(((lon>100)  & (lon<135) & (lat>70)) |
+                              ((lon<=100) & (lat>80)) |
+                              ((lon>315)  & (lat>80)))
         elif self.basin=='Canadian':
-            iy, ix = np.where((lon>=135) & (lon<=315) & (lat>80))
+            #iy, ix = np.where((lon>=135) & (lon<=315) & (lat>70))
+            iy, ix = np.where(((lon>=135) & (lon<250)  & (lat>70)) |
+                              ((lon>=250) & (lon<=315) & (lat>80)))
         elif self.basin=='Fram Strait':
+            iy, ix = np.where(((lon>339) | (lon<11)) & ((lat>78) & (lat<80)))
+        elif self.basin=='Arctic transect':
+            """ 150W and 100E
+            """
             iy, ix = np.where(((lon>339) | (lon<11)) & ((lat>78) & (lat<80)))
         else:
             print "%s basin has not been defined!" % self.basin
@@ -207,6 +223,7 @@ class Product(object):
         depth = range(0,105,5)+range(125,525,25)+range(550,2050,50)+range(2100,9200,100)
         dat = np.loadtxt(bfile,skiprows=2,delimiter=',')
         b2d = np.reshape([depth[int(i)-1] for i in dat[:,2]],(180,360))
+        #return np.ma.masked_values(np.ma.hstack((b2d[:,180:],b2d[:,:180])),0)
         return np.ma.masked_values(b2d,0)
 
     def readOneFile(self,fn,ncvarname,maxdpth=0.):
@@ -464,7 +481,9 @@ class GECCO2(Product):
         fldmask = np.ma.mask_or(basinmask.mask,bathymask)
         ncvarname = self.ncvarname[varname] % maxdpth
         ncvar = fp.variables[ncvarname]
-        data = np.ma.squeeze(np.ma.array(ncvar[i]))
+        # GECCO2 salinity data lons are from -179.5 to 179.5
+        #data = np.ma.squeeze(np.ma.array(ncvar[i,:,self.lix]))
+        data = np.ma.hstack((ncvar[i][:,180:],ncvar[i][:,:180]))
         ldata  = np.ma.array(data,mask=fldmask)
         return np.ma.masked_values(ldata,self.FillValue) # do not average across the basin
 
@@ -508,6 +527,8 @@ class GECCO2(Product):
         fn = 'GECCO2_intS_annmean_1948to2011_all_layers_r360x180.nc'
         fp = self.getNetCDFfilepointer(fn)
         lon, lat  = self.readLatLon(fp)
+        # GECCO2 salinity data lons are from -179.5 to 179.5
+        lon       = np.hstack((lon[180:],lon[:180]))
         dates     = self.getGECCO2SalinityDates(fp)
         basinmask = self.findBasinIndex(lon,lat)
         pdata     = getattr(self,varname)
@@ -680,6 +701,7 @@ class Sumata(Product):
         fn = self.getNetCDFfilename()
         fp = self.getNetCDFfilepointer(fn)
         lon, lat  = self.readLatLon(fp)
+        lon = np.ma.hstack((lon[180:],lon[:180]))
         depth     = np.array(fp.variables[self.ncdepthname])
         basinmask = self.findBasinIndex(lon,lat)
         for varname in ['S','T']:
@@ -691,7 +713,8 @@ class Sumata(Product):
             # if seasonal average is not representative we may
             # need to plot seasons separately
             for i in range(4):
-                data    = np.ma.masked_values(ncvar[i],FillValue)*basinmask
+                data    = np.ma.concatenate((ncvar[i][:,:,180:],ncvar[i][:,:,:180]),axis=2)
+                data    = np.ma.masked_values(data,FillValue)*basinmask
                 data_ba = np.ma.mean(data,axis=tuple(range(1, data.ndim)))
                 tdata.append(self.getLayeredDepthProfile(varname,depth,data_ba))
             pdata.data = np.ma.mean(tdata,axis=0)
@@ -701,6 +724,7 @@ class Sumata(Product):
         """ varname is either T or S
         Read data from a netCDF file and return its temporal mean
         for the basin-averaged profile.
+        Note: lons are from -180 to 180!
         """
         fn = self.getNetCDFfilename()
         fp = self.getNetCDFfilepointer(fn)
@@ -1108,10 +1132,10 @@ class Products(object):
             ax.set_ylabel(self.ylabel)
             ax.set_title("%s %s" % (self.pretitle[panelno],self.title))
             ax.set_xlabel(self.xlabel[vname])
-            if vname=='T':
-                leg = ax.legend(lne,tuple(lgd),ncol=1,bbox_to_anchor=(0.3, 0.25))
-            else:
-                leg = ax.legend(lne,tuple(lgd),ncol=1,bbox_to_anchor=(0.3, 0.25))
+            #if vname=='T':
+            #    leg = ax.legend(lne,tuple(lgd),ncol=1,bbox_to_anchor=(0.2, 0.35))
+            #else:
+            leg = ax.legend(lne,tuple(lgd),ncol=1,bbox_to_anchor=(0.25, 0.35))
             leg.get_frame().set_edgecolor('k')
             leg.get_frame().set_linewidth(1.0)
             leg.get_frame().set_alpha(1.0)
@@ -1174,20 +1198,20 @@ class Products(object):
             ax.set_title("%s %s" % (self.pretitle[panelno],self.title))
             ax.set_xlabel(self.xlabel['S'])
             ax.legend(lne,tuple(lgd),ncol=1,\
-                      bbox_to_anchor=(1.0, 0.2))
+                      bbox_to_anchor=(1.4, 0.1))
         #plt.show()
         plt.savefig('./basin_avg/TS_'+self.fileout+'.pdf')
 
 if __name__ == "__main__":
     for basin in ['Antarctic','Arctic','Nansen','Canadian']:
-    #for basin in ['Canadian']:
+    #for basin in ['Arctic']:
         if basin in ['Antarctic']:
             prset = Products([UoR,GloSea5,MOVEG2i,GECCO2,EN4,\
                               ECDA,ORAP5,GLORYS2V4,CGLORS,SODA331],basin)
         else:
             prset = Products([UoR,GloSea5,MOVEG2i,GECCO2,EN4,\
                               ECDA,ORAP5,GLORYS2V4,CGLORS,SODA331,TOPAZ],basin)
-        #prset = Products([GECCO2],basin)
+        #prset = Products([GloSea5],basin)
         prset.readProfiles()
         for vname in ['T','S']:
             prset.getMultiModelMean(vname)
