@@ -438,7 +438,8 @@ class EN4(Product):
         self.fpat = "EN4.2.0.g10_int%s_annmean_%dto%d_%d-%dm.nc"
         self.ncvarname = {'T':'t_int_',\
                           'S':'s_int_'}
-        self.linecolor = self.scattercolor = 'pink'
+        self.linecolor = self.scattercolor = 'darkgrey'
+        self.linestyle = '-.'
         self.bathymetry = self.bathymetry[7:,:]
 
     def readVarProfile(self,varname):
@@ -1128,7 +1129,7 @@ class Products(object):
                 ax.set_xlim(xmin-np.abs(0.1*xmin),xmax+np.abs(0.1*xmax))
             else:
                 ax.set_xlim(xmin-np.abs(0.01*xmin),xmax+np.abs(0.01*xmax))
-                #ax.set_xlim([32, 36])
+                #ax.set_xlim([33.8, 34.6])
             ax.set_ylabel(self.ylabel)
             ax.set_title("%s %s" % (self.pretitle[panelno],self.title))
             ax.set_xlabel(self.xlabel[vname])
@@ -1194,17 +1195,18 @@ class Products(object):
             lne, lgd = lnes[panelno],lgds[panelno]
             ax.set_ylim(np.min(ti)-0.2,np.max(ti)+0.2)
             ax.set_xlim(np.min(si)-0.2,np.max(si)+0.2)
+            #ax.set_xlim([33.8, 34.6])
             ax.set_ylabel(self.xlabel['T'])
             ax.set_title("%s %s" % (self.pretitle[panelno],self.title))
             ax.set_xlabel(self.xlabel['S'])
             ax.legend(lne,tuple(lgd),ncol=1,\
-                      bbox_to_anchor=(1.4, 0.1))
+                      bbox_to_anchor=(1.4, 0.15))
         #plt.show()
         plt.savefig('./basin_avg/TS_'+self.fileout+'.pdf')
 
 if __name__ == "__main__":
     for basin in ['Antarctic','Arctic','Nansen','Canadian']:
-    #for basin in ['Arctic']:
+    #for basin in ['Antarctic']:
         if basin in ['Antarctic']:
             prset = Products([UoR,GloSea5,MOVEG2i,GECCO2,EN4,\
                               ECDA,ORAP5,GLORYS2V4,CGLORS,SODA331],basin)
