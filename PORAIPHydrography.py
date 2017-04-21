@@ -57,7 +57,7 @@ class Product(object):
         else:
             self.LevelBounds = level_bounds
         self.bathymetry = self.readWOA13Bathymetry()
-        if basin in ['Arctic,','Nansen','Canadian']:
+        if basin in ['Arctic,','Nansen','Amerasian']:
             """ data in shallower than mindpth are excluded
             """
             ib = np.where(self.bathymetry<500)
@@ -200,7 +200,7 @@ class Product(object):
             iy, ix = np.where(((lon>100)  & (lon<135) & (lat>70)) |
                               ((lon<=100) & (lat>80)) |
                               ((lon>315)  & (lat>80)))
-        elif self.basin=='Canadian':
+        elif self.basin=='Amerasian':
             #iy, ix = np.where((lon>=135) & (lon<=315) & (lat>70))
             iy, ix = np.where(((lon>=135) & (lon<250)  & (lat>70)) |
                               ((lon>=250) & (lon<=315) & (lat>80)))
@@ -1008,7 +1008,7 @@ class Products(object):
         self.ProductPanels = {'CGLORS':0,'GECCO2':0,'GLORYS':0,'GloSea5':0,\
                               'ORAP5':1,'SODA3.3.1':1,'TOPAZ':1,'UoR':1,\
                               'ECDA':2,'MOVEG2i':2,'EN4':2}
-        self.pretitle = ['(a)','(b)','(c)']
+        self.pretitle = ['(a)','(b)','(c)','(d)','(e)','(f)']
         modstr = '_'.join([p.dset for p in self.products])
         self.fileout = "%s_%04d-%04d_%s" % \
                        (modstr,syr,eyr,basin)
@@ -1131,7 +1131,10 @@ class Products(object):
                 ax.set_xlim(xmin-np.abs(0.01*xmin),xmax+np.abs(0.01*xmax))
                 #ax.set_xlim([33.8, 34.6])
             ax.set_ylabel(self.ylabel)
-            ax.set_title("%s %s" % (self.pretitle[panelno],self.title))
+            if self.basin=='Amerasian':
+                ax.set_title(self.pretitle[panelno+3])
+            else:
+                ax.set_title(self.pretitle[panelno])
             ax.set_xlabel(self.xlabel[vname])
             #if vname=='T':
             #    leg = ax.legend(lne,tuple(lgd),ncol=1,bbox_to_anchor=(0.2, 0.35))
@@ -1197,7 +1200,10 @@ class Products(object):
             ax.set_xlim(np.min(si)-0.2,np.max(si)+0.2)
             #ax.set_xlim([33.8, 34.6])
             ax.set_ylabel(self.xlabel['T'])
-            ax.set_title("%s %s" % (self.pretitle[panelno],self.title))
+            if self.basin=='Amerasian':
+                ax.set_title(self.pretitle[panelno+3])
+            else:
+                ax.set_title(self.pretitle[panelno])
             ax.set_xlabel(self.xlabel['S'])
             ax.legend(lne,tuple(lgd),ncol=1,\
                       bbox_to_anchor=(1.4, 0.15))
@@ -1205,8 +1211,8 @@ class Products(object):
         plt.savefig('./basin_avg/TS_'+self.fileout+'.pdf')
 
 if __name__ == "__main__":
-    for basin in ['Antarctic','Arctic','Nansen','Canadian']:
-    #for basin in ['Antarctic']:
+    #for basin in ['Antarctic','Arctic','Nansen','Canadian']:
+    for basin in ['Arctic']:
         if basin in ['Antarctic']:
             prset = Products([UoR,GloSea5,MOVEG2i,GECCO2,EN4,\
                               ECDA,ORAP5,GLORYS2V4,CGLORS,SODA331],basin)
@@ -1214,6 +1220,9 @@ if __name__ == "__main__":
             prset = Products([UoR,GloSea5,MOVEG2i,GECCO2,EN4,\
                               ECDA,ORAP5,GLORYS2V4,CGLORS,SODA331,TOPAZ],basin)
         #prset = Products([GloSea5],basin)
+        for prd in prset.products:
+            print "%s: %s" % (prd.legend,prd.linecolor)
+        continue
         prset.readProfiles()
         for vname in ['T','S']:
             prset.getMultiModelMean(vname)
