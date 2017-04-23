@@ -1000,14 +1000,20 @@ class Products(object):
         if basin not in ['Antarctic']:
             self.sumata = Sumata(basin)
         self.woa13 = WOA13(basin)
+        self.en4   = EN4(basin,syr,eyr)
         self.xlabel = {'T':"Temperature [$^\circ$C]",\
-                       'S':"Salinity [psu]"}
+                       'S':"Salinity [ppm]"}
         self.ylabel = "depth [m]"
         self.ymin   = 3100 # m
         # Products per 3 panels:
-        self.ProductPanels = {'CGLORS':0,'GECCO2':0,'GLORYS':0,'GloSea5':0,\
-                              'ORAP5':1,'SODA3.3.1':1,'TOPAZ':1,'UoR':1,\
-                              'ECDA':2,'MOVEG2i':2,'EN4':2}
+        # For TS-diagrams
+        self.ProductPanels = {'CGLORS':0,'GECCO2':0,'GLORYS':0,'GloSea5':1,\
+                              'ORAP5':1,'SODA3.3.1':2,'TOPAZ':2,'UoR':2,\
+                              'ECDA':0,'MOVEG2i':1}
+        # For T,S-profiles
+        self.ProductProfilePanels = {'CGLORS':1,'GECCO2':1,'GLORYS':1,'GloSea5':1,\
+                              'ORAP5':2,'SODA3.3.1':2,'TOPAZ':2,'UoR':2,\
+                              'ECDA':1,'MOVEG2i':2}
         self.pretitle = ['(a)','(b)','(c)','(d)','(e)','(f)']
         modstr = '_'.join([p.dset for p in self.products])
         self.fileout = "%s_%04d-%04d_%s" % \
@@ -1024,6 +1030,7 @@ class Products(object):
         if self.basin not in ['Antarctic']:
             self.sumata.readProfile()
         self.woa13.readProfile()
+        self.en4.readProfile()
 
     def readTransects(self):
         """ Reads now both T and S transects
@@ -1055,6 +1062,14 @@ class Products(object):
             for p in prdlist])
         return np.ma.min(data), np.ma.max(data)
 
+    def getDiffDataRange(self,vname,refprod):
+        prdlist = self.products
+        data = np.ma.hstack([np.ma.array(getattr(getattr(p,vname),'data')) -\
+                             np.ma.array(getattr(getattr(refprod,vname),'data')) \
+            for p in prdlist])
+        val = np.ma.max(np.ma.abs(data))
+        return -1*val, val
+
     def calcDensityMap(self):
         # Calculate how many gridcells we need in the x and y dimensions
         tmin, tmax = self.getDataRange('T')
@@ -1082,15 +1097,27 @@ class Products(object):
                       drawstyle='steps-post',color=product.linecolor)[0]
         return lne
 
+    def plotOneDiffProfile(self,product,refproduct,vname,ax):
+        y = getattr(getattr(product,vname),'lz')
+        x = getattr(getattr(product,vname),'data') -\
+            getattr(getattr(refproduct,vname),'data')
+        lne = ax.plot(np.ma.hstack((x[0],x)),\
+                      np.hstack((0,y)),\
+                      lw=2,linestyle=product.linestyle,\
+                      drawstyle='steps-post',color=product.linecolor)[0]
+        return lne
+
     def getRefProductList(self):
-        # First Sumata and WOA13 climatologies, and MMM
+        # First Sumata, WOA13 and EN4 climatologies, and MMM
         if self.basin in ['Antarctic']:
-            prdlist = [self.woa13,self.mmm]
+            prdlist = [self.woa13,self.en4,self.mmm]
         else:
-            prdlist = [self.sumata,self.woa13,self.mmm]
+            prdlist = [self.sumata,self.woa13,self.en4,self.mmm]
         return prdlist
 
-    def plotDepthProfile(self,vname):
+    def _plotDepthProfile(self,vname):
+        """ old version
+        """
         xmin, xmax = self.getDataRange(vname)
         fig = plt.figure(figsize=(8*2,10))
         axs = [plt.axes([0.10, 0.1, .2, .8]),\
@@ -1130,6 +1157,80 @@ class Products(object):
             else:
                 ax.set_xlim(xmin-np.abs(0.01*xmin),xmax+np.abs(0.01*xmax))
                 #ax.set_xlim([33.8, 34.6])
+            ax.set_ylabel(self.ylabel)
+            if self.basin in ['Amerasian']:
+                ax.set_title(self.pretitle[panelno+3])
+            else:
+                ax.set_title(self.pretitle[panelno])
+            ax.set_xlabel(self.xlabel[vname])
+            #if vname=='T':
+            #    leg = ax.legend(lne,tuple(lgd),ncol=1,bbox_to_anchor=(0.2, 0.35))
+            #else:
+            leg = ax.legend(lne,tuple(lgd),ncol=1,bbox_to_anchor=(0.25, 0.35))
+            leg.get_frame().set_edgecolor('k')
+            leg.get_frame().set_linewidth(1.0)
+            leg.get_frame().set_alpha(1.0)
+        #plt.show()
+        plt.savefig('./basin_avg/'+vname+'_'+self.fileout+'.pdf')
+
+    def plotDepthProfile(self,vname):
+        if self.basin in ['Antarctic']:
+            refobsprod = self.woa13
+        else:
+            refobsprod = self.sumata
+        refproduct = self.mmm
+        xmin, xmax = self.getDiffDataRange(vname,refproduct)
+        fig = plt.figure(figsize=(8*2,10))
+        axs = [plt.axes([0.10, 0.1, .2, .8]),\
+               plt.axes([0.40, 0.1, .2, .8]),\
+               plt.axes([0.70, 0.1, .2, .8])]
+        lnes = [[],[],[]]
+        lgds = [[],[],[]]
+        for panelno, ax in enumerate(axs):
+            lne, lgd = lnes[panelno],lgds[panelno]
+            if panelno==0:
+                prdlist  = self.getRefProductList()
+                for product in prdlist:
+                    x = getattr(getattr(product,vname),'data')
+                    if x.all() is np.ma.masked:
+                        """ all values are masked
+                        """
+                        continue
+                    lne.append(self.plotOneProfile(product,vname,ax))
+                    lgd.append(product.legend)
+            else:
+                # then individual models
+                ax.plot([0,0],[0,4000],lw=1,linestyle=refproduct.linestyle,\
+                        color=refproduct.linecolor)
+                lne.append(self.plotOneDiffProfile(refobsprod,refproduct,vname,ax))
+                lgd.append(refobsprod.legend)
+                for product in self.products:
+                    if panelno != self.ProductProfilePanels[product.dset]:
+                        continue
+                    x = getattr(getattr(product,vname),'data')
+                    if x.all() is np.ma.masked:
+                        """ all values are masked
+                        """
+                        continue
+                    #ax, lne, lgd = axs[panelno],lnes[panelno],lgds[panelno]
+                    lne.append(self.plotOneDiffProfile(product,refproduct,vname,ax))
+                    lgd.append(product.legend)
+        for panelno, ax in enumerate(axs):
+            lne, lgd = lnes[panelno],lgds[panelno]
+            ax.invert_yaxis()
+            ax.set_yticks([0,100,300,700,1500,3000])
+            ax.set_ylim(self.ymin,0)
+            if panelno>0:
+                if vname=='T':
+                    if self.basin in ['Antarctic']:
+                        ax.set_xlim(-0.45,0.45)
+                    else:
+                        ax.set_xlim(-0.65,0.65)
+                else:
+                    if self.basin in ['Antarctic','Amerasian']:
+                        ax.set_xlim(-0.85,0.85)
+                    else:
+                        ax.set_xlim(-1.45,1.45)
             ax.set_ylabel(self.ylabel)
             if self.basin=='Amerasian':
                 ax.set_title(self.pretitle[panelno+3])
@@ -1200,7 +1301,7 @@ class Products(object):
             ax.set_xlim(np.min(si)-0.2,np.max(si)+0.2)
             #ax.set_xlim([33.8, 34.6])
             ax.set_ylabel(self.xlabel['T'])
-            if self.basin=='Amerasian':
+            if self.basin in ['Amerasian']:
                 ax.set_title(self.pretitle[panelno+3])
             else:
                 ax.set_title(self.pretitle[panelno])
@@ -1211,18 +1312,15 @@ class Products(object):
         plt.savefig('./basin_avg/TS_'+self.fileout+'.pdf')
 
 if __name__ == "__main__":
-    #for basin in ['Antarctic','Arctic','Nansen','Canadian']:
-    for basin in ['Arctic']:
+    for basin in ['Antarctic','Arctic','Nansen','Amerasian']:
+    #for basin in ['Arctic']:
         if basin in ['Antarctic']:
-            prset = Products([UoR,GloSea5,MOVEG2i,GECCO2,EN4,\
-                              ECDA,ORAP5,GLORYS2V4,CGLORS,SODA331],basin)
+            prset = Products([CGLORS,ECDA,GECCO2,GloSea5,GLORYS2V4,\
+                              MOVEG2i,ORAP5,SODA331,UoR],basin)
         else:
-            prset = Products([UoR,GloSea5,MOVEG2i,GECCO2,EN4,\
-                              ECDA,ORAP5,GLORYS2V4,CGLORS,SODA331,TOPAZ],basin)
+            prset = Products([CGLORS,ECDA,GECCO2,GloSea5,GLORYS2V4,\
+                              MOVEG2i,ORAP5,SODA331,TOPAZ,UoR],basin)
         #prset = Products([GloSea5],basin)
-        for prd in prset.products:
-            print "%s: %s" % (prd.legend,prd.linecolor)
-        continue
         prset.readProfiles()
         for vname in ['T','S']:
             prset.getMultiModelMean(vname)
