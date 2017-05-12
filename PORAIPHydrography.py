@@ -57,11 +57,16 @@ class Product(object):
         else:
             self.LevelBounds = level_bounds
         self.bathymetry = self.readWOA13Bathymetry()
-        if basin in ['Arctic,','Nansen','Amerasian']:
-            """ data in shallower than mindpth are excluded
-            """
-            ib = np.where(self.bathymetry<500)
-            self.bathymetry[ib] = 0.
+        if basin in ['Arctic,','Eurasian','Amerasian']:
+            mindpth = 500
+        elif basin in ['Antarctic']:
+            mindpth = 1000
+        else:
+            mindpth = 0
+        """ data in shallower than mindpth are excluded
+        """
+        ib = np.where(self.bathymetry<mindpth)
+        self.bathymetry[ib] = 0.
         for vname in ['T','S']:
             setattr(self,vname,ProfVar(vname,self.LevelBounds[vname]))
         self.nclatname, self.nclonname    = 'lat', 'lon'
@@ -196,7 +201,7 @@ class Product(object):
             iy, ix = np.where(((lon>100) & (lon<250) & (lat>70)) |
                               ((lon<=100) & (lat>80)) |
                               ((lon>=250) & (lat>80)))
-        elif self.basin=='Nansen':
+        elif self.basin=='Eurasian':
             #iy, ix = np.where(((lon<135) & (lat>80)) | ((lon>315) & (lat>80)))
             iy, ix = np.where(((lon>100)  & (lon<135) & (lat>70)) |
                               ((lon<=100) & (lat>80)) |
@@ -439,7 +444,8 @@ class EN4(Product):
         self.fpat = "EN4.2.0.g10_int%s_annmean_%dto%d_%d-%dm.nc"
         self.ncvarname = {'T':'t_int_',\
                           'S':'s_int_'}
-        self.linecolor = self.scattercolor = 'darkgrey'
+        self.linecolor = 'green'
+        self.scattercolor = 'darkgrey'
         self.linestyle = '-.'
         self.bathymetry = self.bathymetry[7:,:]
 
@@ -674,7 +680,8 @@ class MultiModelMean(Product):
     def __init__(self,basin):
         super( MultiModelMean, self).__init__(basin)
         self.dset = self.legend = 'MMM'
-        self.linecolor = self.scattercolor = self.edgecolor = 'lightgrey'
+        self.linecolor = 'red'
+        self.scattercolor = self.edgecolor = 'lightgrey'
         self.linestyle = ':'
         self.lw = 3
 
@@ -691,7 +698,8 @@ class Sumata(Product):
         self.fpat = "ts-clim/hiroshis-clim/archive_v12_QC2_3_DPL_checked_2d_season_all-remapbil-oraip.nc"
         self.ncvarname = {'T':'temperature',\
                           'S':'salinity'}
-        self.linecolor = self.scattercolor = 'black'
+        self.linecolor = 'black'
+        self.scattercolor = 'black'
         self.lw = 3
 
     def getNetCDFfilename(self):
@@ -754,6 +762,7 @@ class WOA13(Sumata):
         super( WOA13, self).__init__(basin,syr,eyr)
         self.dset = self.legend = 'WOA13'
         self.fpat = "ts-clim/woa13/woa13-clim-1995-2012-season.nc"
+        self.linecolor = 'blue'
         self.scattercolor = 'white'
         self.linestyle = '--'
         self.lettercolor = 'black'
@@ -1114,9 +1123,9 @@ class Products(object):
     def getRefProductList(self):
         # First Sumata, WOA13 and EN4 climatologies, and MMM
         if self.basin in ['Antarctic']:
-            prdlist = [self.woa13,self.en4,self.mmm]
+            prdlist = [self.en4,self.woa13,self.mmm]
         else:
-            prdlist = [self.sumata,self.woa13,self.en4,self.mmm]
+            prdlist = [self.en4,self.woa13,self.sumata,self.mmm]
         return prdlist
 
     def _plotDepthProfile(self,vname):
@@ -1204,8 +1213,10 @@ class Products(object):
                     lgd.append(product.legend)
             else:
                 # then individual models
-                ax.plot([0,0],[0,4000],lw=1,linestyle=refproduct.linestyle,\
-                        color=refproduct.linecolor)
+                ax.plot([0,0],[0,self.ymin],lw=1,linestyle=refproduct.linestyle,\
+                        color='k')
+                        #color=refproduct.linecolor)
+                ### obs - MMM
                 lne.append(self.plotOneDiffProfile(refobsprod,refproduct,vname,ax))
                 lgd.append(refobsprod.legend)
                 for product in self.products:
@@ -1318,8 +1329,8 @@ class Products(object):
         plt.savefig('./basin_avg/TS_'+self.fileout+'.pdf')
 
 if __name__ == "__main__":
-    #for basin in ['Antarctic','Arctic','Nansen','Amerasian']:
-    for basin in ['Arctic']:
+    #for basin in ['Antarctic','Arctic','Eurasian','Amerasian']:
+    for basin in ['Antarctic']:
         if basin in ['Antarctic']:
             prset = Products([CGLORS,ECDA,GECCO2,GloSea5,GLORYS2V4,\
                               MOVEG2i,ORAP5,SODA331,UoR],basin)
