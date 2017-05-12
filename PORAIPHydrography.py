@@ -12,7 +12,7 @@ import glob
 import string
 import numpy as np
 import matplotlib as mpl
-#mpl.use('Agg')
+mpl.use('Agg')
 import matplotlib.pyplot as plt
 import netCDF4 as nc
 from datetime import datetime
@@ -67,6 +67,7 @@ class Product(object):
         self.nclatname, self.nclonname    = 'lat', 'lon'
         self.nctimename, self.ncdepthname = 'time', 'depth'
         self.linestyle = '-'
+        self.lw = 2
         self.lettercolor = 'white'
         self.edgecolor = 'black'
 
@@ -675,6 +676,7 @@ class MultiModelMean(Product):
         self.dset = self.legend = 'MMM'
         self.linecolor = self.scattercolor = self.edgecolor = 'lightgrey'
         self.linestyle = ':'
+        self.lw = 3
 
     def calcMultiModelMean(self,products,vname,maxis=(0,)):
         setattr(getattr(self,vname),'data',\
@@ -690,6 +692,7 @@ class Sumata(Product):
         self.ncvarname = {'T':'temperature',\
                           'S':'salinity'}
         self.linecolor = self.scattercolor = 'black'
+        self.lw = 3
 
     def getNetCDFfilename(self):
         return self.fpat
@@ -754,6 +757,7 @@ class WOA13(Sumata):
         self.scattercolor = 'white'
         self.linestyle = '--'
         self.lettercolor = 'black'
+        self.lw = 3
 
 class ORAP5(Product):
     def __init__(self,basin,syr,eyr):
@@ -1093,7 +1097,7 @@ class Products(object):
         x = getattr(getattr(product,vname),'data')
         lne = ax.plot(np.ma.hstack((x[0],x)),\
                       np.hstack((0,y)),\
-                      lw=2,linestyle=product.linestyle,\
+                      lw=product.lw,linestyle=product.linestyle,\
                       drawstyle='steps-post',color=product.linecolor)[0]
         return lne
 
@@ -1215,6 +1219,8 @@ class Products(object):
                     #ax, lne, lgd = axs[panelno],lnes[panelno],lgds[panelno]
                     lne.append(self.plotOneDiffProfile(product,refproduct,vname,ax))
                     lgd.append(product.legend)
+                # replot refobs so that it tops individual ORAs
+                self.plotOneDiffProfile(refobsprod,refproduct,vname,ax)
         for panelno, ax in enumerate(axs):
             lne, lgd = lnes[panelno],lgds[panelno]
             ax.invert_yaxis()
@@ -1312,8 +1318,8 @@ class Products(object):
         plt.savefig('./basin_avg/TS_'+self.fileout+'.pdf')
 
 if __name__ == "__main__":
-    for basin in ['Antarctic','Arctic','Nansen','Amerasian']:
-    #for basin in ['Arctic']:
+    #for basin in ['Antarctic','Arctic','Nansen','Amerasian']:
+    for basin in ['Arctic']:
         if basin in ['Antarctic']:
             prset = Products([CGLORS,ECDA,GECCO2,GloSea5,GLORYS2V4,\
                               MOVEG2i,ORAP5,SODA331,UoR],basin)
