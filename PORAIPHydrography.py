@@ -1244,7 +1244,9 @@ class Products(object):
                     else:
                         ax.set_xlim(-0.65,0.65)
                 else:
-                    if self.basin in ['Antarctic','Amerasian']:
+                    if self.basin in ['Antarctic']:
+                        ax.set_xlim(-0.25,0.25)
+                    elif self.basin in ['Amerasian']:
                         ax.set_xlim(-0.85,0.85)
                     else:
                         ax.set_xlim(-1.45,1.45)
@@ -1275,7 +1277,10 @@ class Products(object):
         scatterlw, scattersize = 1, 200
         for panelno, ax in enumerate(axs):
             CS = ax.contour(si,ti,dens, linestyles='dashed', colors='k')
-            ax.clabel(CS, fontsize=12, inline=1, fmt='%2.1f') # Label every second level
+            if self.basin in ['Antarctic']:
+                ax.clabel(CS, fontsize=12, inline=1, fmt='%3.2f') # Label every second level
+            else:
+                ax.clabel(CS, fontsize=12, inline=1, fmt='%2.1f') # Label every second level
             lne, lgd = lnes[panelno],lgds[panelno]
             prdlist  = self.getRefProductList()
             for product in prdlist:
