@@ -72,7 +72,7 @@ class Product(object):
         self.nclatname, self.nclonname    = 'lat', 'lon'
         self.nctimename, self.ncdepthname = 'time', 'depth'
         self.linestyle = '-'
-        self.lw = 2
+        self.lw = 3
         self.lettercolor = 'white'
         self.edgecolor = 'black'
 
@@ -1116,7 +1116,7 @@ class Products(object):
             getattr(getattr(refproduct,vname),'data')
         lne = ax.plot(np.ma.hstack((x[0],x)),\
                       np.hstack((0,y)),\
-                      lw=2,linestyle=product.linestyle,\
+                      lw=3,linestyle=product.linestyle,\
                       drawstyle='steps-post',color=product.linecolor)[0]
         return lne
 
@@ -1193,7 +1193,7 @@ class Products(object):
             refobsprod = self.sumata
         refproduct = self.mmm
         xmin, xmax = self.getDiffDataRange(vname,refproduct)
-        fig = plt.figure(figsize=(8*2,10))
+        fig = plt.figure(figsize=(6*2,7.5))
         axs = [plt.axes([0.10, 0.1, .2, .8]),\
                plt.axes([0.40, 0.1, .2, .8]),\
                plt.axes([0.70, 0.1, .2, .8])]
@@ -1213,7 +1213,7 @@ class Products(object):
                     lgd.append(product.legend)
             else:
                 # then individual models
-                ax.plot([0,0],[0,self.ymin],lw=1,linestyle=refproduct.linestyle,\
+                ax.plot([0,0],[0,self.ymin],lw=2,linestyle=refproduct.linestyle,\
                         color='k')
                         #color=refproduct.linecolor)
                 ### obs - MMM
@@ -1250,6 +1250,12 @@ class Products(object):
                         ax.set_xlim(-0.85,0.85)
                     else:
                         ax.set_xlim(-1.45,1.45)
+            else:
+                if self.basin in ['Amerasian','Eurasian','Arctic']:
+                    if vname=='T':
+                        ax.set_xlim(-1.80,1.10)
+                    else:
+                        ax.set_xlim(31,35)
             ax.set_ylabel(self.ylabel)
             if self.basin=='Amerasian':
                 ax.set_title(self.pretitle[panelno+3])
@@ -1267,7 +1273,7 @@ class Products(object):
         plt.savefig('./basin_avg/'+vname+'_'+self.fileout+'.pdf')
 
     def plotTSProfile(self):
-        fig = plt.figure(figsize=(8*2,10))
+        fig = plt.figure(figsize=(6*2,7.5))
         axs = [plt.axes([0.10, 0.1, .2, .8]),\
                plt.axes([0.40, 0.1, .2, .8]),\
                plt.axes([0.70, 0.1, .2, .8])]
@@ -1296,7 +1302,8 @@ class Products(object):
                 for i in range(len(y)):
                     ax.annotate("%d" % (i+1), (x[i],y[i]),\
                                 va='center',ha='center',\
-                                color=product.lettercolor)
+                                color=product.lettercolor,\
+                                fontweight='bold')
                 lgd.append(product.legend)
         # then individual models
         for product in self.products:
@@ -1314,7 +1321,8 @@ class Products(object):
             for i in range(len(y)):
                 ax.annotate("%d" % (i+1), (x[i],y[i]),\
                             va='center',ha='center',\
-                            color=product.lettercolor)
+                            color=product.lettercolor,\
+                            fontweight='bold')
             lgd.append(product.legend)
             # mark depth levels with numbers
         for panelno, ax in enumerate(axs):
@@ -1334,8 +1342,8 @@ class Products(object):
         plt.savefig('./basin_avg/TS_'+self.fileout+'.pdf')
 
 if __name__ == "__main__":
-    #for basin in ['Antarctic','Arctic','Eurasian','Amerasian']:
-    for basin in ['Antarctic']:
+    for basin in ['Antarctic','Arctic','Eurasian','Amerasian']:
+    #for basin in ['Eurasian','Amerasian']:
         if basin in ['Antarctic']:
             prset = Products([CGLORS,ECDA,GECCO2,GloSea5,GLORYS2V4,\
                               MOVEG2i,ORAP5,SODA331,UoR],basin)
