@@ -714,22 +714,26 @@ class Sumata(Product):
         fp = self.getNetCDFfilepointer(fn)
         lon, lat  = self.readLatLon(fp)
         lon = np.ma.hstack((lon[180:],lon[:180]))
-        depth     = np.array(fp.variables[self.ncdepthname])
+        depth = np.array(fp.variables[self.ncdepthname])
         basinmask = self.findBasinIndex(lon,lat)
         for varname in ['S','T']:
             ncvarname = self.ncvarname[varname]
             ncvar     = fp.variables[ncvarname]
             FillValue = self.getFillValue(ncvar)
             pdata = getattr(self,varname)
-            tdata = []
+            # odata is orginal, non-depth-averaged data
+            tdata, odata = [], []
+            setattr(pdata,'depth',depth)
             # if seasonal average is not representative we may
             # need to plot seasons separately
             for i in range(4):
                 data    = np.ma.concatenate((ncvar[i][:,:,180:],ncvar[i][:,:,:180]),axis=2)
                 data    = np.ma.masked_values(data,FillValue)*basinmask
                 data_ba = np.ma.mean(data,axis=tuple(range(1, data.ndim)))
+                odata.append(data_ba)
                 tdata.append(self.getLayeredDepthProfile(varname,depth,data_ba))
             pdata.data = np.ma.mean(tdata,axis=0)
+            setattr(pdata,'odata',np.ma.mean(odata,axis=0))
         fp.close()
 
     def readTransect(self,maxis=(0,2)):
@@ -1091,7 +1095,7 @@ class Products(object):
         ydim = int(round((tmax-tmin)/0.1+1,0))
         # Create empty grid of zeros
         dens = np.zeros((ydim,xdim))
-        # Create temp and salt vectors of appropiate dimensions
+        # Create temp and salt vectors of appropriate dimensions
         ti = np.linspace(1,ydim-1,ydim)*0.1+tmin
         si = np.linspace(1,xdim-1,xdim)*0.1+smin
         # Loop to fill in grid with densities
@@ -1100,6 +1104,14 @@ class Products(object):
                 dens[j,i]=dens0(si[i],ti[j])
         # Substract 1000 to convert to sigma-t
         return si, ti, dens - 1000
+
+    def plotOneNonLevAvgProfile(self,product,vname,ax):
+        y = getattr(getattr(product,vname),'depth')
+        x = getattr(getattr(product,vname),'odata')
+        lne = ax.plot(x,y,\
+                      lw=2,linestyle=product.linestyle,\
+                      color=product.linecolor)[0]
+        return lne
 
     def plotOneProfile(self,product,vname,ax):
         y = getattr(getattr(product,vname),'lz')
@@ -1188,9 +1200,9 @@ class Products(object):
 
     def plotDepthProfile(self,vname):
         if self.basin in ['Antarctic']:
-            refobsprod = self.woa13
+            refobsprods = [self.woa13,self.en4]
         else:
-            refobsprod = self.sumata
+            refobsprods = [self.sumata,self.woa13,self.en4]
         refproduct = self.mmm
         xmin, xmax = self.getDiffDataRange(vname,refproduct)
         fig = plt.figure(figsize=(6*2,7.5))
@@ -1211,14 +1223,20 @@ class Products(object):
                         continue
                     lne.append(self.plotOneProfile(product,vname,ax))
                     lgd.append(product.legend)
+                    # plot non-depth averaged reference obs profile on top
+                    if self.basin in ['Antarctic']:
+                        self.plotOneNonLevAvgProfile(self.woa13,vname,ax)
+                    else:
+                        self.plotOneNonLevAvgProfile(self.sumata,vname,ax)
             else:
                 # then individual models
                 ax.plot([0,0],[0,self.ymin],lw=2,linestyle=refproduct.linestyle,\
                         color='k')
                         #color=refproduct.linecolor)
-                ### obs - MMM
-                lne.append(self.plotOneDiffProfile(refobsprod,refproduct,vname,ax))
-                lgd.append(refobsprod.legend)
+                ### obss - MMM
+                for refobsprod in refobsprods:
+                    lne.append(self.plotOneDiffProfile(refobsprod,refproduct,vname,ax))
+                    lgd.append(refobsprod.legend)
                 for product in self.products:
                     if panelno != self.ProductProfilePanels[product.dset]:
                         continue
@@ -1273,7 +1291,8 @@ class Products(object):
         plt.savefig('./basin_avg/'+vname+'_'+self.fileout+'.pdf')
 
     def plotTSProfile(self):
-        fig = plt.figure(figsize=(6*2,7.5))
+        #fig = plt.figure(figsize=(6*2,7.5))
+        fig = plt.figure(figsize=(3*7.5,7.5))
         axs = [plt.axes([0.10, 0.1, .2, .8]),\
                plt.axes([0.40, 0.1, .2, .8]),\
                plt.axes([0.70, 0.1, .2, .8])]
