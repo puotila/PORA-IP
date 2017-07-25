@@ -680,8 +680,8 @@ class MultiModelMean(Product):
     def __init__(self,basin):
         super( MultiModelMean, self).__init__(basin)
         self.dset = self.legend = 'MMM'
-        self.linecolor = 'red'
-        self.scattercolor = self.edgecolor = 'lightgrey'
+        self.linecolor = self.scattercolor = self.edgecolor = 'red'
+        #self.scattercolor = self.edgecolor = 'lightgrey'
         self.linestyle = ':'
         self.lw = 3
 
@@ -698,8 +698,7 @@ class Sumata(Product):
         self.fpat = "ts-clim/hiroshis-clim/archive_v12_QC2_3_DPL_checked_2d_season_all-remapbil-oraip.nc"
         self.ncvarname = {'T':'temperature',\
                           'S':'salinity'}
-        self.linecolor = 'black'
-        self.scattercolor = 'black'
+        self.linecolor = self.scattercolor = 'black'
         self.lw = 3
 
     def getNetCDFfilename(self):
@@ -1024,9 +1023,12 @@ class Products(object):
         self.ymin   = 3100 # m
         # Products per 3 panels:
         # For TS-diagrams
-        self.ProductPanels = {'CGLORS':0,'GECCO2':0,'GLORYS':0,'GloSea5':1,\
-                              'ORAP5':1,'SODA3.3.1':2,'TOPAZ':2,'UoR':2,\
-                              'ECDA':0,'MOVEG2i':1}
+        self.ProductPanels = {'CGLORS':1,'GECCO2':1,'GLORYS':1,'GloSea5':1,\
+                              'ORAP5':2,'SODA3.3.1':2,'TOPAZ':2,'UoR':2,\
+                              'ECDA':1,'MOVEG2i':2}
+        #self.ProductPanels = {'CGLORS':0,'GECCO2':0,'GLORYS':0,'GloSea5':1,\
+        #                      'ORAP5':1,'SODA3.3.1':2,'TOPAZ':2,'UoR':2,\
+        #                      'ECDA':0,'MOVEG2i':1}
         # For T,S-profiles
         self.ProductProfilePanels = {'CGLORS':1,'GECCO2':1,'GLORYS':1,'GloSea5':1,\
                               'ORAP5':2,'SODA3.3.1':2,'TOPAZ':2,'UoR':2,\
@@ -1271,9 +1273,9 @@ class Products(object):
             else:
                 if self.basin in ['Amerasian','Eurasian','Arctic']:
                     if vname=='T':
-                        ax.set_xlim(-1.80,1.10)
+                        ax.set_xlim(-1.80,1.40)
                     else:
-                        ax.set_xlim(31,35)
+                        ax.set_xlim(29,35)
             ax.set_ylabel(self.ylabel)
             if self.basin=='Amerasian':
                 ax.set_title(self.pretitle[panelno+3])
@@ -1292,7 +1294,7 @@ class Products(object):
 
     def plotTSProfile(self):
         #fig = plt.figure(figsize=(6*2,7.5))
-        fig = plt.figure(figsize=(3*7.5,7.5))
+        fig = plt.figure(figsize=(3*5,5))
         axs = [plt.axes([0.10, 0.1, .2, .8]),\
                plt.axes([0.40, 0.1, .2, .8]),\
                plt.axes([0.70, 0.1, .2, .8])]
@@ -1300,6 +1302,8 @@ class Products(object):
         lgds = [[],[],[]]
         si,ti,dens = self.calcDensityMap()
         scatterlw, scattersize = 1, 200
+        # scatter markers for each depth level
+        scattermarkers = ["o","s","*","^","X"]
         for panelno, ax in enumerate(axs):
             CS = ax.contour(si,ti,dens, linestyles='dashed', colors='k')
             if self.basin in ['Antarctic']:
@@ -1307,7 +1311,11 @@ class Products(object):
             else:
                 ax.clabel(CS, fontsize=12, inline=1, fmt='%2.1f') # Label every second level
             lne, lgd = lnes[panelno],lgds[panelno]
-            prdlist  = self.getRefProductList()
+            # Plot MMM for the first panel only
+            if panelno:
+                prdlist  = self.getRefProductList()[:-1]
+            else:
+                prdlist  = self.getRefProductList()
             for product in prdlist:
                 x = getattr(getattr(product,'T'),'data')
                 if x.all() is np.ma.masked:
@@ -1316,14 +1324,19 @@ class Products(object):
                     continue
                 y = getattr(getattr(product,'T'),'data')
                 x = getattr(getattr(product,'S'),'data')
-                lne.append(ax.scatter(x,y,lw=scatterlw,s=scattersize,\
-                           color=product.scattercolor,edgecolor=product.edgecolor))
                 for i in range(len(y)):
-                    ax.annotate("%d" % (i+1), (x[i],y[i]),\
-                                va='center',ha='center',\
-                                color=product.lettercolor,\
-                                fontweight='bold')
-                lgd.append(product.legend)
+                    scmark = ax.scatter(x[i],y[i],lw=scatterlw,\
+                             s=scattersize,marker=scattermarkers[i],\
+                             color=product.scattercolor,edgecolor=product.edgecolor)
+                    if i==0:
+                        lne.append(scmark)
+                        lgd.append(product.legend)
+                #for i in range(len(y)):
+                #    ax.annotate("%d" % (i+1), (x[i],y[i]),\
+                #                va='center',ha='center',\
+                #                color=product.lettercolor,\
+                #                fontweight='bold')
+                #lgd.append(product.legend)
         # then individual models
         for product in self.products:
             x = getattr(getattr(product,'T'),'data')
@@ -1335,14 +1348,21 @@ class Products(object):
             ax, lne, lgd = axs[panelno],lnes[panelno],lgds[panelno]
             y = getattr(getattr(product,'T'),'data')
             x = getattr(getattr(product,'S'),'data')
-            lne.append(ax.scatter(x,y,lw=scatterlw,s=scattersize,\
-                       color=product.scattercolor))
             for i in range(len(y)):
-                ax.annotate("%d" % (i+1), (x[i],y[i]),\
-                            va='center',ha='center',\
-                            color=product.lettercolor,\
-                            fontweight='bold')
-            lgd.append(product.legend)
+                    scmark = ax.scatter(x[i],y[i],lw=scatterlw,\
+                             s=scattersize,marker=scattermarkers[i],\
+                             color=product.scattercolor,edgecolor=product.edgecolor)
+                    if i==0:
+                        lne.append(scmark)
+                        lgd.append(product.legend)
+            #lne.append(ax.scatter(x,y,lw=scatterlw,s=scattersize,\
+            #           color=product.scattercolor))
+            #for i in range(len(y)):
+            #    ax.annotate("%d" % (i+1), (x[i],y[i]),\
+            #                va='center',ha='center',\
+            #                color=product.lettercolor,\
+            #                fontweight='bold')
+            #lgd.append(product.legend)
             # mark depth levels with numbers
         for panelno, ax in enumerate(axs):
             lne, lgd = lnes[panelno],lgds[panelno]
@@ -1355,8 +1375,9 @@ class Products(object):
             else:
                 ax.set_title(self.pretitle[panelno])
             ax.set_xlabel(self.xlabel['S'])
-            ax.legend(lne,tuple(lgd),ncol=1,\
-                      bbox_to_anchor=(1.4, 0.15))
+            if self.basin not in ['Eurasian']:
+                ax.legend(lne,tuple(lgd),ncol=1,\
+                          bbox_to_anchor=(1.4, 0.35))
         #plt.show()
         plt.savefig('./basin_avg/TS_'+self.fileout+'.pdf')
 
@@ -1373,6 +1394,6 @@ if __name__ == "__main__":
         prset.readProfiles()
         for vname in ['T','S']:
             prset.getMultiModelMean(vname)
-            prset.plotDepthProfile(vname)
+            #prset.plotDepthProfile(vname)
         prset.plotTSProfile()
     print "Finnished!"
