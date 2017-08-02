@@ -10,6 +10,8 @@ import re
 import copy
 import glob
 import string
+import cPickle
+import gzip
 import numpy as np
 import matplotlib as mpl
 mpl.use('Agg')
@@ -1093,6 +1095,7 @@ class Products(object):
         # Calculate how many gridcells we need in the x and y dimensions
         tmin, tmax = self.getDataRange('T')
         smin, smax = self.getDataRange('S')
+        smin, smax, tmin, tmax = smin-0.3, smax+0.3, tmin-0.3, tmax+0.3
         xdim = int(round((smax-smin)/0.1+1,0))
         ydim = int(round((tmax-tmin)/0.1+1,0))
         # Create empty grid of zeros
@@ -1292,6 +1295,20 @@ class Products(object):
         #plt.show()
         plt.savefig('./basin_avg/'+vname+'_'+self.fileout+'.pdf')
 
+    def splitXaxes(self,ax):
+        """ Split x-axis half horizontally
+        """
+        ax.set_visible(False)
+        axp = ax.get_position()
+        axl = plt.axes([axp.x0,axp.y0,0.5*axp.width,axp.height])
+        axl.tick_params(axis='y',right='off',labelright='off')
+        axr = plt.axes([axp.x0+0.5*axp.width,axp.y0,0.5*axp.width,axp.height],sharey=axl)
+        axr.tick_params(axis='y',left='off',labelleft='off')
+        if self.basin in ['Antarctic']:
+            axl.spines['right'].set_visible(False)
+            axr.spines['left'].set_visible(False)
+        return axl, axr
+
     def plotTSProfile(self):
         #fig = plt.figure(figsize=(6*2,7.5))
         fig = plt.figure(figsize=(3*5,5))
@@ -1305,38 +1322,41 @@ class Products(object):
         # scatter markers for each depth level
         scattermarkers = ["o","s","*","^","X"]
         for panelno, ax in enumerate(axs):
-            CS = ax.contour(si,ti,dens, linestyles='dashed', colors='k')
-            if self.basin in ['Antarctic']:
-                ax.clabel(CS, fontsize=12, inline=1, fmt='%3.2f') # Label every second level
-            else:
-                ax.clabel(CS, fontsize=12, inline=1, fmt='%2.1f') # Label every second level
             lne, lgd = lnes[panelno],lgds[panelno]
-            # Plot MMM for the first panel only
-            if panelno:
-                prdlist  = self.getRefProductList()[:-1]
-            else:
-                prdlist  = self.getRefProductList()
-            for product in prdlist:
-                x = getattr(getattr(product,'T'),'data')
-                if x.all() is np.ma.masked:
-                    """ all values are masked
-                    """
-                    continue
-                y = getattr(getattr(product,'T'),'data')
-                x = getattr(getattr(product,'S'),'data')
-                for i in range(len(y)):
-                    scmark = ax.scatter(x[i],y[i],lw=scatterlw,\
-                             s=scattersize,marker=scattermarkers[i],\
-                             color=product.scattercolor,edgecolor=product.edgecolor)
-                    if i==0:
-                        lne.append(scmark)
-                        lgd.append(product.legend)
-                #for i in range(len(y)):
-                #    ax.annotate("%d" % (i+1), (x[i],y[i]),\
-                #                va='center',ha='center',\
-                #                color=product.lettercolor,\
-                #                fontweight='bold')
-                #lgd.append(product.legend)
+            # need to split axes to left and right to get better scale for deep
+            # dense salinities
+            axl, axr = self.splitXaxes(ax)
+            for subx in [axl,axr]:
+                CS = subx.contour(si,ti,dens, linestyles='dashed', colors='k')
+                if self.basin in ['Antarctic']:
+                    subx.clabel(CS, fontsize=12, inline=1, fmt='%3.2f') # Label every second level
+                else:
+                    subx.clabel(CS, fontsize=12, inline=1, fmt='%2.1f') # Label every second level
+                # Plot MMM for the first panel only
+                if panelno:
+                    if self.basin in ['Antarctic']:
+                        # only WOA13 in the rest of panels
+                        prdlist  = self.getRefProductList()[1:2]
+                    else: # Arctic basins
+                        # only Sumata in the rest of panels
+                        prdlist  = self.getRefProductList()[2:3]
+                else: # first panel where panelno == 0
+                    prdlist  = self.getRefProductList()
+                for product in prdlist:
+                    x = getattr(getattr(product,'T'),'data')
+                    if x.all() is np.ma.masked:
+                        """ all values are masked
+                        """
+                        continue
+                    y = getattr(getattr(product,'T'),'data')
+                    x = getattr(getattr(product,'S'),'data')
+                    for i in range(len(y)):
+                        scmark = subx.scatter(x[i],y[i],lw=scatterlw,\
+                                 s=scattersize,marker=scattermarkers[i],\
+                                 color=product.scattercolor,edgecolor=product.edgecolor)
+                        if i==0 and subx==axr:
+                            lne.append(scmark)
+                            lgd.append(product.legend)
         # then individual models
         for product in self.products:
             x = getattr(getattr(product,'T'),'data')
@@ -1348,42 +1368,57 @@ class Products(object):
             ax, lne, lgd = axs[panelno],lnes[panelno],lgds[panelno]
             y = getattr(getattr(product,'T'),'data')
             x = getattr(getattr(product,'S'),'data')
-            for i in range(len(y)):
-                    scmark = ax.scatter(x[i],y[i],lw=scatterlw,\
-                             s=scattersize,marker=scattermarkers[i],\
-                             color=product.scattercolor,edgecolor=product.edgecolor)
-                    if i==0:
-                        lne.append(scmark)
-                        lgd.append(product.legend)
-            #lne.append(ax.scatter(x,y,lw=scatterlw,s=scattersize,\
-            #           color=product.scattercolor))
-            #for i in range(len(y)):
-            #    ax.annotate("%d" % (i+1), (x[i],y[i]),\
-            #                va='center',ha='center',\
-            #                color=product.lettercolor,\
-            #                fontweight='bold')
-            #lgd.append(product.legend)
-            # mark depth levels with numbers
+            # need to split axes to left and right to get better scale for deep
+            # dense salinities
+            axl, axr = self.splitXaxes(ax)
+            scmark = axl.scatter(x[0],y[0],lw=scatterlw,\
+                     s=scattersize,marker=scattermarkers[0],\
+                     color=product.scattercolor,edgecolor=product.edgecolor)
+            lne.append(scmark)
+            lgd.append(product.legend)
+            for i in range(1,len(y)):
+                scmark = axr.scatter(x[i],y[i],lw=scatterlw,\
+                         s=scattersize,marker=scattermarkers[i],\
+                         color=product.scattercolor,edgecolor=product.edgecolor)
+        if self.basin in ['Antarctic']:
+            slmin, slmax, srmin, srmax = 33.9,34.3,34.3,34.8
+        elif self.basin in ['Eurasian']:
+            slmin, slmax, srmin, srmax = 29.6,34.2,33.8,35.2
+        else: #Amerasian
+            slmin, slmax, srmin, srmax = 31.,32.5,33.,35.3
         for panelno, ax in enumerate(axs):
             lne, lgd = lnes[panelno],lgds[panelno]
-            ax.set_ylim(np.min(ti)-0.2,np.max(ti)+0.2)
-            ax.set_xlim(np.min(si)-0.2,np.max(si)+0.2)
+            axl, axr = self.splitXaxes(ax)
+            axl.set_ylim(np.min(ti)-0.2,np.max(ti)+0.2)
+            #axl.set_xlim(np.min(si)-0.3,slmax)
+            axl.set_xlim(slmin,slmax)
+            #axr.set_xlim(srmin,np.max(si)+0.2)
+            axr.set_xlim(srmin,srmax)
+            #axl.set_xlim(np.min(si)-0.2,np.max(si)+0.2)
             #ax.set_xlim([33.8, 34.6])
-            ax.set_ylabel(self.xlabel['T'])
+            labels = axl.get_xticks().tolist()
+            labels[-1] = ''
+            if self.basin in ['Eurasian']:
+                labels[-2] = ''
+            axl.set_xticklabels(labels)
+            labels = axr.get_xticks().tolist()
+            labels[0] = ''
+            axr.set_xticklabels(labels)
+            axl.set_ylabel(self.xlabel['T'])
             if self.basin in ['Amerasian']:
-                ax.set_title(self.pretitle[panelno+3])
+                axl.set_title(self.pretitle[panelno+3],loc='right')
             else:
-                ax.set_title(self.pretitle[panelno])
-            ax.set_xlabel(self.xlabel['S'])
+                axl.set_title(self.pretitle[panelno],loc='right')
+            axl.set_xlabel(self.xlabel['S'],ha='left')
             if self.basin not in ['Eurasian']:
-                ax.legend(lne,tuple(lgd),ncol=1,\
+                axr.legend(lne,tuple(lgd),ncol=1,\
                           bbox_to_anchor=(1.4, 0.35))
         #plt.show()
         plt.savefig('./basin_avg/TS_'+self.fileout+'.pdf')
 
 if __name__ == "__main__":
     for basin in ['Antarctic','Arctic','Eurasian','Amerasian']:
-    #for basin in ['Eurasian','Amerasian']:
+    #for basin in ['Amerasian']:
         if basin in ['Antarctic']:
             prset = Products([CGLORS,ECDA,GECCO2,GloSea5,GLORYS2V4,\
                               MOVEG2i,ORAP5,SODA331,UoR],basin)
@@ -1391,7 +1426,16 @@ if __name__ == "__main__":
             prset = Products([CGLORS,ECDA,GECCO2,GloSea5,GLORYS2V4,\
                               MOVEG2i,ORAP5,SODA331,TOPAZ,UoR],basin)
         #prset = Products([GloSea5],basin)
-        prset.readProfiles()
+        cpf = "oraip-ts-%s.cpickle.gz" % basin
+        if os.path.exists(cpf):
+            fp = gzip.open(cpf)
+            prset = cPickle.load(fp)
+            fp.close()
+        else:
+            prset.readProfiles()
+            fp = gzip.open(cpf,'w')
+            cPickle.dump(prset,fp)
+            fp.close()
         for vname in ['T','S']:
             prset.getMultiModelMean(vname)
             #prset.plotDepthProfile(vname)
